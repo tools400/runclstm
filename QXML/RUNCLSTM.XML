@@ -28,6 +28,7 @@
      <!ATTLIST qrycond
       msg CDATA #REQUIRED
       values CDATA #REQUIRED
+      var CDATA #REQUIRED
      >
      <!ELEMENT sendmsg (#PCDATA)>
      <!ATTLIST sendmsg
@@ -43,14 +44,14 @@
       rtnlib CDATA #IMPLIED
      >
      <!ELEMENT upload (install_instructions | install_program | qrycond |
-                       qcmdexc | sendmsg | mbr | compile | rtvobjd)+>
+                       qcmdexc | sendmsg | mbr | compile | rtvobjd | chgvar)+>
      <!ATTLIST upload
       appname CDATA #REQUIRED
       appauthor CDATA #REQUIRED
       appblddate CDATA #REQUIRED
      >
      ]>
-<upload  appname="RUNCLSTM"  appauthor="Thomas Raddatz"  appblddate="11/27/2015">
+<upload  appname="RUNCLSTM"  appauthor="Thomas Raddatz"  appblddate=" 5/26/2018">
 <install_instructions><![CDATA[
      *----------------------------------------------------------------      ------
      *  1. Upload entire XML to your AS/400 to a source file 112 long, into any mbr
@@ -77,6 +78,8 @@
 <install_program><![CDATA[
       * /// START OF INSTALL PGM HERE   ************************** ///
       *---------------------------------------------------------------------------------------
+      * CRTBNDRPG PGM(QTEMP/XMLINST) SRCFILE(ISPHERE/QBUILD) SRCMBR(*PGM)
+      *---------------------------------------------------------------------------------------
       * Parse / Install from xml text into source members and objects.
       * Copyright (C) 2001    Craig Rutledge    <craig_rutledge@mohawkind.com>
       * Martin Rowe    <Martin@dbg400.net>          scripting cmd prompts
@@ -96,6 +99,12 @@
       * This program is free software, you can redistribute it and/or modify it
       * under the terms of the GNU General Public License as published by
       * the Free Software Foundation.  See GNU General Public License for details
+      *---------------------------------------------------------------------------------------
+      * >>PRE-COMPILER<<
+      *   >>CRTCMD<< CRTBNDRPG    PGM(&LI/&OB) SRCFILE(&SL/&SF) SRCMBR(*PGM) +
+      *                           DBGVIEW(*LIST) OPTION(*EVENTF);
+      *   >>EXECUTE<<
+      * >>END-PRE-COMPILER<<
       *---------------------------------------------------------------------------------------
      H DFTACTGRP(*NO) ACTGRP(*CALLER) BNDDIR('QC2LE')
       *---------------------------------------------------------------------------------------
@@ -319,6 +328,7 @@
      D errFLag         s              1    inz(*off)
      D cnd_msg         s             42
      D cnd_values      s            110
+     D cnd_var         s             10
      D cnd_rtnVal      s             10
      D cnd_array       s                   dim(32) inz like(condition)
      D cnd_ptr         s             10i 0 inz
@@ -432,6 +442,18 @@
       * Set variable &TOLIB
      C                   callp     setVariable('tolib': ParseSrcLib)
       *
+      * Set variable &TGTRLS
+     C                   callp     setVariable('tgtrls': TgtRls)
+      *
+      * Set variable &XMLFILE
+     C                   callp     setVariable('xmlfile': ParseSrcFile)
+      *
+      * Set variable &XMLLIB
+     C                   callp     setVariable('xmllib': ParseSrcFile)
+      *
+      * Set variable &XMLMBR
+     C                   callp     setVariable('xmlmbr': ParseSrcFile)
+      *
       * Override Input file to uploaded text file
      C                   eval      bldexc = 'OVRDBF FILE(XMLINPUT) TOFILE(' +
      C                             %trimr(ParseSrcLib)+'/'+
@@ -515,15 +537,12 @@
      C                   eval      write_flag = *on
       *--------------------------------------------------------------------
       * Compile statement.  Read next record and execute it.
-      * The subroutine TolibToken will replace &tolib with the
-      * library the user has selected at run time.
       *--------------------------------------------------------------------
      C                   when      xmltag1 = '<compile '
      C                   eval      condList= getAttrData('condition':xmlcode:'')
      C                   read      xmlinput
      C                   eval      bldexc = readElement('compile')
      C                   if        isCondition(condList)
-     C                   exsr      TolibToken
      C                   exsr      RplVars
      C                   exsr      SetTgtRls
      C                   callp     qcmdexc(bldexc:%len(%trimr(bldexc)))
@@ -543,7 +562,6 @@
      C                   eval      bldexc = readElement('qcmdexc')
      C                   if        isCondition(condList) and
      C                             isRelease(tgtRls: release)
-     C                   exsr      TolibToken
      C                   exsr      RplVars
      C                   exsr      SetTgtRls
      C                   if        %subst(bldexc: 1: 3) = 'DLT'
@@ -571,7 +589,6 @@
      C                   read      xmlinput
      C                   eval      bldexc = readElement('execsql')
      C                   if        isCondition(condList)
-     C                   exsr      TolibToken
      C                   exsr      RplVars
      C                   exsr      srSQLExecute
      C                   endif
@@ -619,8 +636,9 @@
       *--------------------------------------------------------------------
      C                   when      xmltag1 = '<qrycond '
      C                   eval      bldexc = readElement('qrycond')
-     C                   eval      cnd_msg    = getAttrData('msg'   : bldexc:'')
+     C                   eval      cnd_msg = getAttrData('msg'   : bldexc: '')
      C                   eval      cnd_values = getAttrData('values': bldexc:'')
+     C                   eval      cnd_var = getAttrData('var': bldexc: '*NONE')
      C                   exsr      srQueryCond
      C                   endsl
       *
@@ -630,30 +648,6 @@
      C                   exsr      srSQLEnd
      C                   eval      *inlr=*on
      C                   return
-      *--------------------------------------------------------------------
-      * Replace &tolib (no matter how many times it is in the string)
-      * with whatever library the user has selected at run time.
-      *--------------------------------------------------------------------
-     C     TolibToken    begsr
-     C                   eval      aa=%scan('&tolib':bldexc)
-     C                   dow       aa>0
-     C                   eval      bldexc=%replace(%trimr(ParseSrcLib):bldexc:
-     C                             aa:6)
-     C                   eval      aa=%scan('&tolib':bldexc)
-     C                   enddo
-      *  user has selected to override source, reset SRCFILE parm in bldexcs.
-     C                   if        OvrSrcFile <> ''                             xmlpreview override
-     C                   eval      aa=%scan('SRCFILE(':bldexc)
-     C                   if        aa>0
-     C                   eval      aa=%scan('/':bldexc:aa)
-     C                   if        aa>0
-     C                   eval      ll=%scan(')':bldexc:aa)
-     C                   eval      bldexc=%replace(
-     C                               %trimr(OvrSrcFile):bldexc:aa+1:ll-(aa+1))
-     C                   endif
-     C                   endif
-     C                   endif
-     C                   endsr
       *--------------------------------------------------------------------
       * Replace variable names with their associated values.
       *--------------------------------------------------------------------
@@ -799,6 +793,9 @@
      C                   eval      cnd_ptr = cnd_ptr + 1
      C                   eval      cnd_array(cnd_ptr) = cnd_rtnVal
      C                   endif
+     C                   if        (cnd_var <> '*NONE')
+     C                   callp     setVariable(cnd_var: cnd_rtnval)
+     C                   endif
      C                   endsr
       *--------------------------------------------------------------------
       * initialize SQL.
@@ -855,8 +852,7 @@
       *--------------------------------------------------------------------
      P readElement...
      P                 B
-      *
-     D readElement     PI                        like(bldexc)
+     D                 PI                        like(bldexc)
      D  i_element                     9A   value varying
       *
      D i               S             10I 0 inz
@@ -873,15 +869,13 @@
       *
      C                   Return    value
       *
-     P readElement...
      P                 E
       *--------------------------------------------------------------------
       * Double quotes
       *--------------------------------------------------------------------
      P dblQuotes...
      P                 B
-      *
-     D dblQuotes       PI          2048A         varying
+     D                 PI          2048A         varying
      D  i_string                   2048A   value varying
       *
      D x               S             10I 0         inz
@@ -896,15 +890,12 @@
       *
      C                   Return    string
       *
-     P dblQuotes...
      P                 E
       *---------------------------------------------------------------------------------------------
       *  Get Attribute Data from String
       *---------------------------------------------------------------------------------------------
      P getAttrData...
      P                 B
-      *
-     D getAttrData...
      D                 PI          2000A          varying                       like(string_t)
      D  i_attr                       10a   value
      D  i_string                   2000A   value  varying                       like(string_t)
@@ -940,15 +931,12 @@
       *
      C                   Return    attrData
       *
-     P getAttrData...
      P                 E
       *---------------------------------------------------------------------------------------------
       *  Load condition array
       *---------------------------------------------------------------------------------------------
      P loadConditions...
      P                 B
-      *
-     D loadConditions...
      D                 PI                  dim(32) like(condition)
      D  i_conditions                128A   value
       *
@@ -956,26 +944,42 @@
      D cnd_array       s                   dim(32) inz like(condition)
      D pValue          s               *   inz
      D x               s             10i 0 inz
+     D i               s             10i 0 inz
+     D cnd_value       s            128a   varying
+     D var_name        s             64a   varying
+     D var_value       s             64a   varying
       *-------------------------------------------------------------------*
-     C                   eval      i_conditions = uCase(i_conditions)
-      *
-     C                   eval      pValue = strtok(i_conditions: ';')
-     C                   dow       pValue <> *null
-     C                   eval      x = x + 1
-     C                   eval      cnd_array(x) = %str(pValue)
-     C                   eval      pValue = strtok(*null: ';')
-     C                   enddo
-      *
-     C                   Return    cnd_array
-     P loadConditions...
+      /FREE
+
+         i_conditions = uCase(i_conditions);
+
+         pValue = strtok(i_conditions: ';');
+         dow (pValue <> *null);
+            x = x + 1;
+            cnd_value = %str(pValue);
+            i = %scan('=': cnd_value);
+            if (i = 0);
+               cnd_array(x) = cnd_value;
+            else;
+               var_name = %subst(cnd_value: 1: i-1);
+               if (%subst(var_name: 1: 1) = '&');
+                  var_name = %subst(var_name: 2);
+               endif;
+               var_value = %subst(cnd_value: i+1);
+               setVariable(var_name: var_value);
+               cnd_array(x) = var_value;
+            endif;
+            pValue = strtok(*null: ';');
+         enddo;
+
+         return cnd_array;
+      /END-FREE
      P                 E
       *---------------------------------------------------------------------------------------------
       *  Check for a condition
       *---------------------------------------------------------------------------------------------
      P isCondition...
      P                 B
-      *
-     D isCondition...
      D                 PI              n
      D  i_condList                 2000A   value
       *
@@ -984,6 +988,7 @@
      D pValue          S               *   inz
      D aCondition      S             10a   inz
       *-------------------------------------------------------------------*
+      *
      C                   eval      i_condList = uCase(i_condList)
       *
      C                   if        (i_condList = '*NONE')  or
@@ -1010,15 +1015,12 @@
      C                   endif
       *
      C                   Return    isCondition
-     P isCondition...
      P                 E
       *---------------------------------------------------------------------------------------------
       *  Get the current release level of the operation system
       *---------------------------------------------------------------------------------------------
      P getCurrentRelease...
      P                 B
-      *
-     D getCurrentRelease...
      D                 PI            10A
       *
       *  QSZRTVPR API
@@ -1047,18 +1049,17 @@
      D  bytPrv                       10i 0 inz(0)
      D  bytAvl                       10i 0 inz(0)
       *-------------------------------------------------------------------*
+      *
      C                   Callp     QSZRTVPR(prdr0100: %size(prdr0100):
      C                                      'PRDR0100': prdi0100: errCode)
      C                   Return    prdr0100.releaseLvl
-     P getCurrentRelease...
+      *
      P                 E
       *---------------------------------------------------------------------------------------------
       *  Check the release level
       *---------------------------------------------------------------------------------------------
      P isRelease...
      P                 B
-      *
-     D isRelease...
      D                 PI              n
      D  i_os_release                  6A   value
      D  i_release                    10A   value
@@ -1071,6 +1072,7 @@
      D  r_space                4      4a
      D  r_level                5     10a
       *-------------------------------------------------------------------*
+      *
      C                   If        i_release = '*CURRENT'
      C                   Eval      isRelease = *on
      C                   Else
@@ -1097,15 +1099,13 @@
      C                   Endif
       *
      C                   Return    isRelease
-     P isRelease...
+      *
      P                 E
       *---------------------------------------------------------------------------------------------
       *  Replaces the value of a given keyword.
       *---------------------------------------------------------------------------------------------
      P setTargetRelease...
      P                 B
-      *
-     D setTargetRelease...
      D                 PI          2000A          varying
      D  i_keyword                    10A   value  varying
      D  i_string                   2000A   value  varying
@@ -1122,6 +1122,7 @@
      D tmpCmd          S             10A   inz
       *-------------------------------------------------------------------*
       /FREE
+
          tmpKeyword = uCase(%trimR(i_keyword));
          tmpString  = uCase(%trimR(i_string ));
          x = %scan(' ': tmpString);
@@ -1160,98 +1161,97 @@
          string = %replace(tmpKeyword + '(' + %trimR(i_value) + ')'
                            : i_string: x: l);
          Return string;
+
       /END-FREE
-      *
-     P setTargetRelease...
      P                 E
       *---------------------------------------------------------------------------------------------
       *  Store field value.
       *---------------------------------------------------------------------------------------------
      P setVariable...
      P                 B
-      *
-     D setVariable...
      D                 PI
      D  i_fldName                    10A   value  varying
      D  i_value                      64A   value  varying
      D i               s             10I 0 inz
       *-------------------------------------------------------------------*
       /FREE
+
          if (i_fldName = '');
             return;
          endif;
+
          for i = 1 to fld_x;
-            if (uCase('&' + %trim(i_fldName)) = uCase(fld_name(fld_x)));
-               fld_value(fld_x) = i_value;
-               leave;
+            if (uCase('&' + %trim(i_fldName)) = uCase(fld_name(i)));
+               fld_value(i) = i_value;
+               return;
             endif;
          endfor;
+
          if (fld_x >= %elem(fld_name));
             return;
          endif;
+
          fld_x = fld_x + 1;
          fld_name(fld_x)  = uCase('&' + %trim(i_fldName));
          fld_value(fld_x) = i_value;
+
       /END-FREE
-      *
-     P setVariable...
      P                 E
       *---------------------------------------------------------------------------------------------
       *  get variable name from statement.
       *---------------------------------------------------------------------------------------------
      P getVarName...
      P                 B
-      *
-     D getVarName...
      D                 PI            11a          varying
      D  i_bldexc                           value  like(bldexc)
      D  i_pos                        10i 0 value
      D name            s             11a   varying inz
      D CHARS           c                   '&ABCDEFGHIJKLMNOPQRSTUVWXYZ+
+     D                                      abcdefghijklmnopqrstuvwxyz+
      D                                      1234567890_'
       *-------------------------------------------------------------------*
       /FREE
+
          dow (i_pos<=%len(i_bldexc) and
               %check(CHARS:%subst(i_bldexc:i_pos:1))=0);
             name = name+%subst(i_bldexc:i_pos:1);
             i_pos=i_pos+1;
          enddo;
+
          return name;
+
       /END-FREE
       *
-     P getVarName...
      P                 E
       *---------------------------------------------------------------------------------------------
       *  get variable value.
       *---------------------------------------------------------------------------------------------
      P getVarValue...
      P                 B
-      *
-     D getVarValue...
      D                 PI            64a          varying
      D  i_name                       11a   value  varying
      D i               s             10i 0 inz
-     D value           s             64a   varying inz
+     D value           s             64a   varying inz('?')
       *-------------------------------------------------------------------*
       /FREE
+
          for i=1 to fld_x;
             if (ucase(fld_name(i))=uCase(i_name));
                value=%trimR(fld_value(i));
                leave;
             endif;
          endfor;
+
          return value;
+
       /END-FREE
       *
-     P getVarValue...
      P                 E
       *---------------------------------------------------------------------------------------------
       *  convert to upper case
       *---------------------------------------------------------------------------------------------
      P uCase...
      P                 B
-      *
-     D uCase...
      D                 PI          2000A          varying
      D  i_string                   2000A   value  varying
      D uCase           s           2000A   inz varying
@@ -1259,62 +1259,275 @@
      D UC              C                   CONST('ABCDEFGHIJKLMNOPQRSTUVWXYZ')
       *-------------------------------------------------------------------*
       /FREE
+
          uCase = %xlate(LC:UC:i_string);
+
          return uCase;
+
       /END-FREE
-      *
-     P uCase...
      P                 E
       * /// END   OF INSTALL PGM HERE   ****************************************** ///
       * /// do not copy past this point ///
 ]]>  </install_program>
-<qrycond  msg="'Select language (GER, ENG)'" values="GER        ENG"><![CDATA[
+<qrycond
+  msg="'Select language (GER, ENG)'"
+  values="GER        ENG"
+  var="LANG">
+<![CDATA[
 ]]>  </qrycond>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTCMD CMD(&tolib/RUNCLSTM)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTCMD CMD(&tolib/RUNCLSTME)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTPGM PGM(&tolib/RUNCLSTM)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTSRVPGM SRVPGM(&tolib/RUNCLSTMS1)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTMSGF MSGF(&tolib/RUNCLSTM)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTMSGF MSGF(&tolib/RUNCLSTME)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTPNLGRP PNLGRP(&tolib/RUNCLSTMP)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTPNLGRP PNLGRP(&tolib/RUNCLSTMPE)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTF FILE(&tolib/XDERRCODE)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTF FILE(&tolib/XDMSG)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTF FILE(&tolib/XDQOBJ)
-]]>  </qcmdexc>
-<qcmdexc condition="GER" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTMSGF MSGF(&tolib/RUNCLSTM) TEXT('Tool: RUNCLSTM   (Run CL Statements  )')
-]]>  </qcmdexc>
-<qcmdexc condition="ENG" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTMSGF MSGF(&tolib/RUNCLSTME) TEXT('Tool: RUNCLSTM   (Run CL Statements  )')
-]]>  </qcmdexc>
+<chgvar   condition="*NONE" var="SRCFILE" value="QRUNCLSTM">
+<![CDATA[
+]]>  </chgvar>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
-Installing #MSG_GER  type CLP - in progress.
+Installing A_INSTALL  type CLLE - in progress.
 ]]>  </sendmsg>
 <!-- START OF MEMBER  -->
 <mbr
-mbrname =  "#MSG_GER  "
+mbrname =  "A_INSTALL "
+mbrtype =  "CLLE      "
+mbrtext =  "RUNCLSTM - Installer                              "
+srcfile =  "QRUNCLSTM "
+srclib  =  "selected  "
+srclen  =  "00112"
+srccssid=  "00273">
+<copysrc><![CDATA[
+     /* =================================================================== */
+     /*                                                                     */
+     /*  Documentation:                                                     */
+     /*                                                                     */
+     /*  Utility . . . : RUNCLSTM                                           */
+     /*  Object  . . . : A_INSTALL  (PGM)                                   */
+     /*  Source member : A_INSTALL                                          */
+     /*  Source type . : CLLE                                               */
+     /*  Description   : RUNCLSTM - Installer                               */
+     /*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
+     /*  Created . . . :                                                    */
+     /*                                                                     */
+     /* =================================================================== */
+     /*                                                                     */
+     /*  This software is free software, you can redistribute it and/or     */
+     /*  modify it under the terms of the GNU General Public License (GPL)  */
+     /*  as published by the Free Software Foundation.                      */
+     /*                                                                     */
+     /*  See GNU General Public License for details.                        */
+     /*          http://www.opensource.org                                  */
+     /*          http://www.opensource.org/licenses/gpl-license.html        */
+     /*                                                                     */
+     /* =================================================================== */
+     /*  History:                                                           */
+     /*                                                                     */
+     /*  Datum       Name          Änderung                                 */
+     /*  ----------  ------------  ---------------------------------------  */
+     /*                                                                     */
+     /* =================================================================== */
+     /*   >>PRE-COMPILER<<                                                  */
+     /*     >>CRTCMD<<    CRTBNDCL  PGM(QTEMP/&OB) +                        */
+     /*                             SRCFILE(&SL/&SF) SRCMBR(&SM);           */
+     /*     >>IMPORTANT<<                                                   */
+     /*       >>PARM<<    OPTION(*EVENTF);                                  */
+     /*     >>END-IMPORTANT<<                                               */
+     /*     >>EXECUTE<<                                                     */
+     /*     >>CMD<<       CALL   PGM(QTEMP/A_INSTALL) +                     */
+     /*                          PARM('*CURRENT' '&SF' '&LI' 'GER');        */
+     /*     >>CMD<<       DLTPGM PGM(QTEMP/A_INSTALL);                      */
+     /*   >>END-PRE-COMPILER<<                                              */
+     /* =================================================================== */
+             PGM        PARM(&TGTRLS &SRCFILE &TOLIB &LNG)
+
+             DCL        VAR(&TGTRLS   ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCFILE  ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TOLIB    ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LNG      ) TYPE(*CHAR) LEN( 3)
+
+             DCL        VAR(&SRCLIB   ) TYPE(*CHAR) LEN(10)
+
+             DCL        VAR(&CRTMSGF  ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSGF     ) TYPE(*CHAR) LEN(10) VALUE('RUNCLSTM')
+             DCL        VAR(&PNLGRP   ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&CMD      ) TYPE(*CHAR) LEN(10)
+
+             CHGVAR     VAR(&SRCLIB) VALUE(&TOLIB   )
+
+     /* -------------------------------- */
+     /*  Set language values             */
+     /* -------------------------------- */
+             IF         COND(&LNG *EQ 'ENG') THEN(DO)
+                CHGVAR     VAR(&CRTMSGF) VALUE('A_MSG_ENG')
+                CHGVAR     VAR(&PNLGRP ) VALUE('RUNCLSTMPE')
+                CHGVAR     VAR(&CMD    ) VALUE('RUNCLSTME')
+             ENDDO
+             ELSE       CMD(DO)
+                CHGVAR     VAR(&CRTMSGF) VALUE('A_MSG_GER')
+                CHGVAR     VAR(&PNLGRP ) VALUE('RUNCLSTMP')
+                CHGVAR     VAR(&CMD    ) VALUE('RUNCLSTM')
+             ENDDO
+
+     /* -------------------------------- */
+     /*  Delete old objects              */
+     /* -------------------------------- */
+             DLTCMD    CMD(&TOLIB/&CMD)
+             MONMSG     MSGID(CPF2105)
+
+             DLTCMD    CMD(&TOLIB/RUNCLSTME)
+             MONMSG     MSGID(CPF2105)
+
+             DLTPGM    PGM(&TOLIB/RUNCLSTM)
+             MONMSG     MSGID(CPF2105)
+
+             DLTSRVPGM  SRVPGM(&TOLIB/RUNCLSTMS1)
+             MONMSG     MSGID(CPF2105)
+
+             DLTMSGF    MSGF(&TOLIB/&MSGF)
+             MONMSG     MSGID(CPF2105)
+
+             DLTMSGF    MSGF(&TOLIB/RUNCLSTME)
+             MONMSG     MSGID(CPF2105)
+
+             DLTPNLGRP  PNLGRP(&TOLIB/&PNLGRP)
+             MONMSG     MSGID(CPF2105)
+
+             DLTPNLGRP  PNLGRP(&TOLIB/RUNCLSTMPE)
+             MONMSG     MSGID(CPF2105)
+
+             DLTF       FILE(&TOLIB/XDERRCODE)
+             MONMSG     MSGID(CPF2105)
+
+             DLTF       FILE(&TOLIB/XDMSG)
+             MONMSG     MSGID(CPF2105)
+
+             DLTF       FILE(&TOLIB/XDQOBJ)
+             MONMSG     MSGID(CPF2105)
+
+     /* -------------------------------- */
+     /*  Create message file             */
+     /* -------------------------------- */
+             CRTMSGF    MSGF(&TOLIB/&MSGF) +
+                          TEXT('Tool: RUNCLSTM   (Run CL Statement)')
+
+             CRTCLPGM   PGM(QTEMP/&CRTMSGF) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*PGM) +
+                          OPTION(*LSTDBG) +
+                          TGTRLS(&TGTRLS)
+             DLTSPLF    FILE(&CRTMSGF  ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CALL       PGM(QTEMP/&CRTMSGF) PARM(&TOLIB)
+             DLTPGM     PGM(QTEMP/&CRTMSGF)
+
+     /* -------------------------------- */
+     /*  Create files                    */
+     /* -------------------------------- */
+             CRTPF      FILE(&TOLIB/XDERRCODE) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
+             DLTSPLF    FILE(XDERRCODE ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CRTPF      FILE(&TOLIB/XDMSG    ) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
+             DLTSPLF    FILE(XDMSG     ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CRTPF      FILE(&TOLIB/XDQOBJ   ) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
+             DLTSPLF    FILE(XDQOBJ    ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Create modules                  */
+     /* -------------------------------- */
+             CRTRPGMOD  MODULE(&TOLIB/RUNCLSTMS1) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*MODULE) +
+                          TEXT(*SRCMBRTXT) DBGVIEW(*LIST) +
+                          TGTRLS(&TGTRLS) +
+                          TRUNCNBR(*NO)
+             DLTSPLF    FILE(RUNCLSTMS1) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CRTRPGMOD MODULE(&TOLIB/RUNCLSTMS2) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*MODULE) +
+                          TEXT(*SRCMBRTXT) DBGVIEW(*LIST) +
+                          TGTRLS(&TGTRLS) +
+                          TRUNCNBR(*NO)
+             DLTSPLF    FILE(RUNCLSTMS2) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CRTRPGMOD MODULE(&TOLIB/RUNCLSTMR1) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*MODULE) +
+                          TEXT(*SRCMBRTXT) DBGVIEW(*LIST) +
+                          TGTRLS(&TGTRLS) +
+                          TRUNCNBR(*NO)
+             DLTSPLF    FILE(RUNCLSTMR1) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Create service programs         */
+     /* -------------------------------- */
+             CRTSRVPGM  SRVPGM(&TOLIB/RUNCLSTMS1) +
+                          MODULE(&TOLIB/RUNCLSTMS1 +
+                                 &TOLIB/RUNCLSTMS2 ) +
+                          SRCFILE(&TOLIB/QRUNCLSTM) +
+                          SRCMBR(RUNCLSTMF ) +
+                          ACTGRP(*CALLER) +
+                          DETAIL(*BASIC) +
+                          TEXT('Tool: RUNCLSCT   (Run CL Statement   )')
+             DLTSPLF    FILE(RUNCLSTMS1) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Create programs                 */
+     /* -------------------------------- */
+             CRTPGM     PGM(&TOLIB/RUNCLSTM) +
+                          MODULE(&TOLIB/RUNCLSTMR1) +
+                          BNDSRVPGM(&TOLIB/RUNCLSTMS1) +
+                          BNDDIR(QC2LE) +
+                          ACTGRP(*NEW) +
+                          TGTRLS(&TGTRLS) +
+                          DETAIL(*BASIC)
+             DLTSPLF    FILE(RUNCLSTM  ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Panel groups                    */
+     /* -------------------------------- */
+             CRTPNLGRP PNLGRP(&TOLIB/RUNCLSTMP) +
+                          SRCFILE(&SRCLIB/&SRCFILE) +
+                          SRCMBR(&PNLGRP)
+             DLTSPLF    FILE(RUNCLSTMP ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Create commands                 */
+     /* -------------------------------- */
+             CRTCMD     CMD(&TOLIB/RUNCLSTM) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(&CMD) +
+                          PGM(&TOLIB/RUNCLSTM)                   +
+                          HLPSCHIDX(*NONE)                       +
+                          HLPPNLGRP(*LIBL/RUNCLSTMP)             +
+                          HLPID(RUNCLSTM  )                      +
+                          PRDLIB(&TOLIB)
+             DLTSPLF    FILE(&CMD      ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Delete obsolete objects         */
+     /* -------------------------------- */
+             DLTF       FILE(&TOLIB/XDERRCODE)
+             DLTF       FILE(&TOLIB/XDMSG)
+             DLTF       FILE(&TOLIB/XDQOBJ)
+
+             DLTMOD    MODULE(&TOLIB/RUNCLSTMS1)
+             DLTMOD    MODULE(&TOLIB/RUNCLSTMS2)
+             DLTMOD    MODULE(&TOLIB/RUNCLSTMR1)
+
+             ENDPGM
+]]>  </copysrc>
+</mbr>
+<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
+Installing A_MSG_ENG  type CLP - in progress.
+]]>  </sendmsg>
+<!-- START OF MEMBER  -->
+<mbr
+mbrname =  "A_MSG_ENG "
 mbrtype =  "CLP       "
 mbrtext =  "MSG: USR0001 - USR0004                            "
 srcfile =  "QRUNCLSTM "
@@ -1323,8 +1536,8 @@ srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0001                    */
-     /* LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.                     */
+     /*   Cmd-ADDMSGD für Message-ID :   USR0001                    */
+     /* Länge ausserhalb des gültigen Bereichs.                     */
      /*-------------------------------------------------------------*/
 
              PGM        PARM(&LI)
@@ -1338,135 +1551,6 @@ srccssid=  "00273">
                 MSGID(USR0001) +
                 MSGF(&LI/RUNCLSTM) +
                 MSG(+
-'LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.'                             +
-                ) +
-                SEV(00) +
-     /*   Keine Ersatzvariablen definiert!                          */ +
-                ALROPT(*NO) +
-                CCSID( 65535) +
-                /*  -EOF-  */
-
-     /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0002                    */
-     /* Fehler bei BefehlsausfÃ¼hrung in Zeile &1.                   */
-     /*-------------------------------------------------------------*/
-
-             RMVMSGD MSGID(USR0002) MSGF(&LI/RUNCLSTM)
-             MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
-
-             ADDMSGD +
-                MSGID(USR0002) +
-                MSGF(&LI/RUNCLSTM) +
-                MSG(+
-'Fehler bei BefehlsausfÃ¼hrung in Zeile &1.'                           +
-                ) +
-                SECLVL(+
-'Befehl  . . . . : &2'                                                +
-                ) +
-                SEV(30) +
-                FMT( +
-                    (*DEC 006 2) +
-                    (*CHAR 512) +
-                ) +
-                ALROPT(*NO) +
-                CCSID( 65535) +
-                /*  -EOF-  */
-
-     /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0003                    */
-     /* Die Betriebsart &1 ist bereits eingestellt worden.          */
-     /*-------------------------------------------------------------*/
-
-             RMVMSGD MSGID(USR0003) MSGF(&LI/RUNCLSTM)
-             MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
-
-             ADDMSGD +
-                MSGID(USR0003) +
-                MSGF(&LI/RUNCLSTM) +
-                MSG(+
-'Die Betriebsart &1 ist bereits eingestellt worden.'                  +
-                ) +
-                SECLVL(+
-'MaÃŸnahmen . . . :   Stellen Sie sicher, dass die Anweisung &2 nicht z-
-weimal hintereinander verwendet wird. Die Anweisung &2 muss immer mit -
-&3 beendet werden.'                                                   +
-                ) +
-                SEV(00) +
-                FMT( +
-                    (*CHAR 010) +
-                    (*CHAR 010) +
-                    (*CHAR 010) +
-                ) +
-                ALROPT(*NO) +
-                CCSID( 65535) +
-                /*  -EOF-  */
-
-     /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0004                    */
-     /* Die Betriebsart &1 ist bereits eingestellt worden.          */
-     /*-------------------------------------------------------------*/
-
-             RMVMSGD MSGID(USR0004) MSGF(&LI/RUNCLSTM)
-             MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
-
-             ADDMSGD +
-                MSGID(USR0004) +
-                MSGF(&LI/RUNCLSTM) +
-                MSG(+
-'Die Betriebsart &1 ist bereits eingestellt worden.'                  +
-                ) +
-                SECLVL(+
-'MaÃŸnahmen . . . :   Stellen Sie sicher, dass die Anweisung &2 nicht z-
-weimal hintereinander verwendet wird. Die Anweisung &2 muss immer mit -
-&3 eingeleitet werden.'                                               +
-                ) +
-                SEV(00) +
-                FMT( +
-                    (*CHAR 010) +
-                    (*CHAR 010) +
-                    (*CHAR 010) +
-                ) +
-                ALROPT(*NO) +
-                CCSID( 65535) +
-                /*  -EOF-  */
-
-             RCLRSC LVL(*)
-
-             ENDPGM
-]]>  </copysrc>
-</mbr>
-<compile  condition="GER"><![CDATA[
-CRTCLPGM PGM(&tolib/#MSG_GER) SRCFILE(&tolib/QRUNCLSTM)
-]]>  </compile>
-<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
-Installing #MSG_ENG  type CLP - in progress.
-]]>  </sendmsg>
-<!-- START OF MEMBER  -->
-<mbr
-mbrname =  "#MSG_ENG  "
-mbrtype =  "CLP       "
-mbrtext =  "MSG: USR0001 - USR0004                            "
-srcfile =  "QRUNCLSTM "
-srclib  =  "selected  "
-srclen  =  "00112"
-srccssid=  "00273">
-<copysrc><![CDATA[
-     /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0001                    */
-     /* LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.                     */
-     /*-------------------------------------------------------------*/
-
-             PGM        PARM(&LI)
-
-             DCL        VAR(&LI) TYPE(*CHAR) LEN(10)
-
-             RMVMSGD MSGID(USR0001) MSGF(&LI/RUNCLSTME)
-             MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
-
-             ADDMSGD +
-                MSGID(USR0001) +
-                MSGF(&LI/RUNCLSTME) +
-                MSG(+
 'Value for length out of range.'                                      +
                 ) +
                 SEV(00) +
@@ -1476,16 +1560,16 @@ srccssid=  "00273">
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0002                    */
-     /* Fehler bei BefehlsausfÃ¼hrung in Zeile &1.                   */
+     /*   Cmd-ADDMSGD für Message-ID :   USR0002                    */
+     /* Fehler bei Befehlsausführung in Zeile &1.                   */
      /*-------------------------------------------------------------*/
 
-             RMVMSGD MSGID(USR0002) MSGF(&LI/RUNCLSTME)
+             RMVMSGD MSGID(USR0002) MSGF(&LI/RUNCLSTM)
              MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
 
              ADDMSGD +
                 MSGID(USR0002) +
-                MSGF(&LI/RUNCLSTME) +
+                MSGF(&LI/RUNCLSTM) +
                 MSG(+
 'Error at sequence number &1.'                                        +
                 ) +
@@ -1502,16 +1586,16 @@ srccssid=  "00273">
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0003                    */
+     /*   Cmd-ADDMSGD für Message-ID :   USR0003                    */
      /* Die Betriebsart &1 ist bereits eingestellt worden.          */
      /*-------------------------------------------------------------*/
 
-             RMVMSGD MSGID(USR0003) MSGF(&LI/RUNCLSTME)
+             RMVMSGD MSGID(USR0003) MSGF(&LI/RUNCLSTM)
              MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
 
              ADDMSGD +
                 MSGID(USR0003) +
-                MSGF(&LI/RUNCLSTME) +
+                MSGF(&LI/RUNCLSTM) +
                 MSG(+
 'Mode &1 is already activ.'                                           +
                 ) +
@@ -1531,16 +1615,16 @@ ately after each other. The tag &2 always must be followed by the tag -
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0004                    */
+     /*   Cmd-ADDMSGD für Message-ID :   USR0004                    */
      /* Die Betriebsart &1 ist bereits eingestellt worden.          */
      /*-------------------------------------------------------------*/
 
-             RMVMSGD MSGID(USR0004) MSGF(&LI/RUNCLSTME)
+             RMVMSGD MSGID(USR0004) MSGF(&LI/RUNCLSTM)
              MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
 
              ADDMSGD +
                 MSGID(USR0004) +
-                MSGF(&LI/RUNCLSTME) +
+                MSGF(&LI/RUNCLSTM) +
                 MSG(+
 'Mode &1 is already activ.'                                           +
                 ) +
@@ -1565,158 +1649,132 @@ ately after each other. The tag &2 always must be preceded by the tag -
 
 ]]>  </copysrc>
 </mbr>
-<compile  condition="ENG"><![CDATA[
-CRTCLPGM PGM(&tolib/#MSG_ENG) SRCFILE(&tolib/QRUNCLSTM)
-]]>  </compile>
-<qcmdexc condition="GER" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CALL PGM(&tolib/#MSG_GER) PARM('&tolib')
-]]>  </qcmdexc>
-<qcmdexc condition="ENG" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CALL PGM(&tolib/#MSG_ENG) PARM('&tolib')
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTPGM PGM(&tolib/#MSG_GER)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTPGM PGM(&tolib/#MSG_ENG)
-]]>  </qcmdexc>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
-Installing XDERRCODE  type PF - in progress.
+Installing A_MSG_GER  type CLP - in progress.
 ]]>  </sendmsg>
 <!-- START OF MEMBER  -->
 <mbr
-mbrname =  "XDERRCODE "
-mbrtype =  "PF        "
-mbrtext =  "Ext.DS  : API error code                          "
+mbrname =  "A_MSG_GER "
+mbrtype =  "CLP       "
+mbrtext =  "MSG: USR0001 - USR0004                            "
 srcfile =  "QRUNCLSTM "
 srclib  =  "selected  "
 srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
-      * ============================================================= *
-      *   API error code structure                                    *
-      * ============================================================= *
-      *   >>PRE-COMPILER<<                                            *
-      *                                                               *
-      *     >>CRTCMD<<  CRTPF         FILE(&LI/&OB) +                 *
-      *                               SRCFILE(&SL/&SF)  +             *
-      *                               SRCMBR(&SM);                    *
-      *                                                               *
-      *     >>COMPILE<<                                               *
-      *       >>PARM<<                MAXMBRS(1);                     *
-      *       >>PARM<<                MBR(*FILE);                     *
-      *       >>PARM<<                FILETYPE(*DATA);                *
-      *     >>END-COMPILE<<                                           *
-      *                                                               *
-      *     >>EXECUTE<<                                               *
-      *                                                               *
-      *   >>END-PRE-COMPILER<<                                        *
-      *===============================================================*
-      *
-     A          R ERRCODE                   TEXT('API error code structure')
-      *
-     A            BYTPRV         9B 0       TEXT('Bytes Provided ')
-     A            BYTAVL         9B 0       TEXT('Bytes Available')
-     A            EXCID          7A         TEXT('Exception ID   ')
-     A            RES01          1A         TEXT('Reserved       ')
-     A            EXCDTA       256A         TEXT('Exception Data ')
-      *
+     /*-------------------------------------------------------------*/
+     /*   Cmd-ADDMSGD für Message-ID :   USR0001                    */
+     /* Länge ausserhalb des gültigen Bereichs.                     */
+     /*-------------------------------------------------------------*/
+
+             PGM        PARM(&LI)
+
+             DCL        VAR(&LI) TYPE(*CHAR) LEN(10)
+
+             RMVMSGD MSGID(USR0001) MSGF(&LI/RUNCLSTM)
+             MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
+
+             ADDMSGD +
+                MSGID(USR0001) +
+                MSGF(&LI/RUNCLSTM) +
+                MSG(+
+'Länge ausserhalb des gültigen Bereichs.'                             +
+                ) +
+                SEV(00) +
+     /*   Keine Ersatzvariablen definiert!                          */ +
+                ALROPT(*NO) +
+                CCSID( 65535) +
+                /*  -EOF-  */
+
+     /*-------------------------------------------------------------*/
+     /*   Cmd-ADDMSGD für Message-ID :   USR0002                    */
+     /* Fehler bei Befehlsausführung in Zeile &1.                   */
+     /*-------------------------------------------------------------*/
+
+             RMVMSGD MSGID(USR0002) MSGF(&LI/RUNCLSTM)
+             MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
+
+             ADDMSGD +
+                MSGID(USR0002) +
+                MSGF(&LI/RUNCLSTM) +
+                MSG(+
+'Fehler bei Befehlsausführung in Zeile &1.'                           +
+                ) +
+                SECLVL(+
+'Befehl  . . . . : &2'                                                +
+                ) +
+                SEV(30) +
+                FMT( +
+                    (*DEC 006 2) +
+                    (*CHAR 512) +
+                ) +
+                ALROPT(*NO) +
+                CCSID( 65535) +
+                /*  -EOF-  */
+
+     /*-------------------------------------------------------------*/
+     /*   Cmd-ADDMSGD für Message-ID :   USR0003                    */
+     /* Die Betriebsart &1 ist bereits eingestellt worden.          */
+     /*-------------------------------------------------------------*/
+
+             RMVMSGD MSGID(USR0003) MSGF(&LI/RUNCLSTM)
+             MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
+
+             ADDMSGD +
+                MSGID(USR0003) +
+                MSGF(&LI/RUNCLSTM) +
+                MSG(+
+'Die Betriebsart &1 ist bereits eingestellt worden.'                  +
+                ) +
+                SECLVL(+
+'Maßnahmen . . . :   Stellen Sie sicher, dass die Anweisung &2 nicht z-
+weimal hintereinander verwendet wird. Die Anweisung &2 muss immer mit -
+&3 beendet werden.'                                                   +
+                ) +
+                SEV(00) +
+                FMT( +
+                    (*CHAR 010) +
+                    (*CHAR 010) +
+                    (*CHAR 010) +
+                ) +
+                ALROPT(*NO) +
+                CCSID( 65535) +
+                /*  -EOF-  */
+
+     /*-------------------------------------------------------------*/
+     /*   Cmd-ADDMSGD für Message-ID :   USR0004                    */
+     /* Die Betriebsart &1 ist bereits eingestellt worden.          */
+     /*-------------------------------------------------------------*/
+
+             RMVMSGD MSGID(USR0004) MSGF(&LI/RUNCLSTM)
+             MONMSG  MSGID(CPF2419)     /* MsgID nicht gefunden */
+
+             ADDMSGD +
+                MSGID(USR0004) +
+                MSGF(&LI/RUNCLSTM) +
+                MSG(+
+'Die Betriebsart &1 ist bereits eingestellt worden.'                  +
+                ) +
+                SECLVL(+
+'Maßnahmen . . . :   Stellen Sie sicher, dass die Anweisung &2 nicht z-
+weimal hintereinander verwendet wird. Die Anweisung &2 muss immer mit -
+&3 eingeleitet werden.'                                               +
+                ) +
+                SEV(00) +
+                FMT( +
+                    (*CHAR 010) +
+                    (*CHAR 010) +
+                    (*CHAR 010) +
+                ) +
+                ALROPT(*NO) +
+                CCSID( 65535) +
+                /*  -EOF-  */
+
+             RCLRSC LVL(*)
+
+             ENDPGM
 ]]>  </copysrc>
 </mbr>
-<compile  condition="*NONE"><![CDATA[
-CRTPF FILE(&tolib/XDERRCODE) SRCFILE(&tolib/QRUNCLSTM)
-]]>  </compile>
-<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
-Installing XDMSG  type PF - in progress.
-]]>  </sendmsg>
-<!-- START OF MEMBER  -->
-<mbr
-mbrname =  "XDMSG     "
-mbrtype =  "PF        "
-mbrtext =  "Ext.DS  : Message                                 "
-srcfile =  "QRUNCLSTM "
-srclib  =  "selected  "
-srclen  =  "00112"
-srccssid=  "00273">
-<copysrc><![CDATA[
-      * ============================================================= *
-      *   Message structure                                           *
-      * ============================================================= *
-      *   >>PRE-COMPILER<<                                            *
-      *                                                               *
-      *     >>CRTCMD<<  CRTPF         FILE(&LI/&OB) +                 *
-      *                               SRCFILE(&SL/&SF)  +             *
-      *                               SRCMBR(&SM);                    *
-      *                                                               *
-      *     >>COMPILE<<                                               *
-      *       >>PARM<<                MAXMBRS(1);                     *
-      *       >>PARM<<                MBR(*FILE);                     *
-      *       >>PARM<<                FILETYPE(*DATA);                *
-      *                                                               *
-      *     >>END-COMPILE<<                                           *
-      *                                                               *
-      *     >>EXECUTE<<                                               *
-      *                                                               *
-      *   >>END-PRE-COMPILER<<                                        *
-      * ============================================================= *
-      **
-     A          R MSG                       TEXT('Message structure')
-      **
-     A            ID             7A         TEXT('Message ID     ')
-     A            DATA         512A         TEXT('Message Data   ')
-     A            TYPE          10A         TEXT('Message Type   ')
-     A            FILE          10A         TEXT('Message File   ')
-     A            LIB           10A         TEXT('Message Library')
-      **
-]]>  </copysrc>
-</mbr>
-<compile  condition="*NONE"><![CDATA[
-CRTPF FILE(&tolib/XDMSG) SRCFILE(&tolib/QRUNCLSTM)
-]]>  </compile>
-<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
-Installing XDQOBJ  type PF - in progress.
-]]>  </sendmsg>
-<!-- START OF MEMBER  -->
-<mbr
-mbrname =  "XDQOBJ    "
-mbrtype =  "PF        "
-mbrtext =  "Ext.DS  : Qualified object name                   "
-srcfile =  "QRUNCLSTM "
-srclib  =  "selected  "
-srclen  =  "00112"
-srccssid=  "00273">
-<copysrc><![CDATA[
-      * ============================================================= *
-      *   Qualified object name                                       *
-      * ============================================================= *
-      *   >>PRE-COMPILER<<                                            *
-      *                                                               *
-      *     >>CRTCMD<<  CRTPF         FILE(&LI/&OB) +                 *
-      *                               SRCFILE(&SL/&SF)  +             *
-      *                               SRCMBR(&SM);                    *
-      *                                                               *
-      *     >>COMPILE<<                                               *
-      *       >>PARM<<                MAXMBRS(1);                     *
-      *       >>PARM<<                MBR(*FILE);                     *
-      *       >>PARM<<                FILETYPE(*DATA);                *
-      *                                                               *
-      *     >>END-COMPILE<<                                           *
-      *                                                               *
-      *     >>EXECUTE<<                                               *
-      *                                                               *
-      *   >>END-PRE-COMPILER<<                                        *
-      *===============================================================*
-      *
-     A          R QOBJ                      TEXT('Qualified object name')
-      *
-     A            NAME          10A         TEXT('Object name      ')
-     A            LIB           10A         TEXT('Library          ')
-      *
-]]>  </copysrc>
-</mbr>
-<compile  condition="*NONE"><![CDATA[
-CRTPF FILE(&tolib/XDQOBJ) SRCFILE(&tolib/QRUNCLSTM)
-]]>  </compile>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
 Installing COPYRIGHT  type RPGLE - in progress.
 ]]>  </sendmsg>
@@ -1731,6 +1789,615 @@ srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
      H COPYRIGHT('V1.2.2 - 27.11.2015 - mailto:thomas.raddatz@tools400.de')
+]]>  </copysrc>
+</mbr>
+<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
+Installing RUNCLSTM  type CMD - in progress.
+]]>  </sendmsg>
+<!-- START OF MEMBER  -->
+<mbr
+mbrname =  "RUNCLSTM  "
+mbrtype =  "CMD       "
+mbrtext =  "Tool: RUNCLSTM   (Run CL Statements         ) Ger "
+srcfile =  "QRUNCLSTM "
+srclib  =  "selected  "
+srclen  =  "00112"
+srccssid=  "00273">
+<copysrc><![CDATA[
+/* =================================================================== */
+/*                                                                     */
+/*  Kurzdokumentation :                                                */
+/*                                                                     */
+/*  Bereich . . . : RUNCLSTM                                           */
+/*  Objekt  . . . : RUNCLSTM                                           */
+/*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         ) Ger  */
+/*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
+/*  Datum . . . . : 03.08.2000                                         */
+/*                                                                     */
+/* =================================================================== */
+/*                                                                     */
+/*  This software is free software, you can redistribute it and/or     */
+/*  modify it under the terms of the GNU General Public License (GPL)  */
+/*  as published by the Free Software Foundation.                      */
+/*                                                                     */
+/*  See GNU General Public License for details.                        */
+/*          http://www.opensource.org                                  */
+/*          http://www.opensource.org/licenses/gpl-license.html        */
+/*                                                                     */
+/* =================================================================== */
+/*  History:                                                           */
+/*                                                                     */
+/*  Datum       Name          Änderung                                 */
+/*  ----------  ------------  ---------------------------------------  */
+/*                                                                     */
+/* =================================================================== */
+/* >>PRE-COMPILER<<                                                    */
+/*                                                                     */
+/*   >>CRTCMD<< CRTCMD       CMD(&LI/&OB) +                            */
+/*                           SRCFILE(&SL/&SF) +                        */
+/*                           SRCMBR(&SM);                              */
+/*                                                                     */
+/*   >>COMPILE<<                                                       */
+/*     >>PARM<< PGM(*LIBL/RUNCLSTM);                                   */
+/*     >>PARM<< HLPPNLGRP(*LIBL/RUNCLSTMP);                            */
+/*     >>PARM<< HLPID(RUNCLSTM);                                       */
+/*     >>PARM<< PRDLIB(&LI);                                           */
+/*   >>END-COMPILE<<                                                   */
+/*                                                                     */
+/*   >>EXECUTE<<                                                       */
+/*                                                                     */
+/* >>END-PRE-COMPILER<<                                                */
+/* =================================================================== */
+
+             CMD        PROMPT('CL-Anweisungen ausführen')
+
+             PARM       KWD(USESRCFILE) TYPE(QUAL1)        +
+                        MIN(1)                             +
+                        PROMPT('Quellendatei')
+
+             PARM       KWD(USESRCMBR ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(1)                           +
+                          PROMPT('Teildatei')
+
+             PARM       KWD(STRSEQ    ) TYPE(*DEC )        +
+                          LEN(6 2)                         +
+                          MIN(0)                           +
+                          DFT(*FIRST)                      +
+                          SPCVAL((*FIRST 0))               +
+                          PROMPT('Startzeilennummer')
+
+             PARM       KWD(ENDSEQ    ) TYPE(*DEC )        +
+                          LEN(6 2)                         +
+                          MIN(0)                           +
+                          DFT(*LAST)                       +
+                          SPCVAL((*LAST  9999,99))         +
+                          PROMPT('Endezeilennummer')
+
+             PARM       KWD(LIB       ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Bibliothek      (&LI)')
+
+             PARM       KWD(OBJ       ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Objekt          (&OB)')
+
+             PARM       KWD(TYPECODE  ) TYPE(*CHAR)        +
+                          LEN(6)                           +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Type Code       (&TY)')
+
+             PARM       KWD(SRCLIB    ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Quellenbibl.    (&SL)')
+
+             PARM       KWD(SRCFILE   ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Quellendatei    (&SF)')
+
+             PARM       KWD(SRCMBR    ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Quell.Teildatei (&SM)')
+
+             PARM       KWD(TESTLIB   ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Testbibliothek  (&TL)')
+
+             PARM       KWD(TESTOBJ   ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Testobjekt      (&TO)')
+
+             PARM       KWD(TGTRLS    ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Zielrelease     (&TR)')
+
+             PARM       KWD(FRMSRCLIB ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Von-Quellenbibl.(&FL)')
+
+             PARM       KWD(FRMSRCFILE) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Von-Quellendatei(&FF)')
+
+             PARM       KWD(FRMSRCMBR ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Von-Quell.Teild.(&FM)')
+
+             PARM       KWD(USER0     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U0)')
+
+             PARM       KWD(USER1     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U1)')
+
+             PARM       KWD(USER2     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U2)')
+
+             PARM       KWD(USER3     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U3)')
+
+             PARM       KWD(USER4     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U4)')
+
+             PARM       KWD(USER5     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U5)')
+
+             PARM       KWD(USER6     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U6)')
+
+             PARM       KWD(USER7     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U7)')
+
+             PARM       KWD(USER8     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U8)')
+
+             PARM       KWD(USER9     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Wert für Parameter       (&U9)')
+
+             PARM       KWD(MSGF      ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          CONSTANT(RUNCLSTM)
+
+             PARM       KWD(NAMING    ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*SYS)                        +
+                          RSTD(*YES)                       +
+                          SPCVAL((*SYS )                   +
+                                 (*SQL ))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('SQL Namenskonvention')
+
+ QUAL1:      QUAL       TYPE(*NAME) LEN(10) MIN(1)
+             QUAL       TYPE(*NAME) LEN(10) DFT(*LIBL)     +
+                          SPCVAL((*LIBL) (*CURLIB))        +
+                          PROMPT('Bibliothek')
+
+]]>  </copysrc>
+</mbr>
+<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
+Installing RUNCLSTME  type CMD - in progress.
+]]>  </sendmsg>
+<!-- START OF MEMBER  -->
+<mbr
+mbrname =  "RUNCLSTME "
+mbrtype =  "CMD       "
+mbrtext =  "Tool: RUNCLSTM   (Run CL Statements         ) Eng "
+srcfile =  "QRUNCLSTM "
+srclib  =  "selected  "
+srclen  =  "00112"
+srccssid=  "00273">
+<copysrc><![CDATA[
+/* =================================================================== */
+/*                                                                     */
+/*  Kurzdokumentation :                                                */
+/*                                                                     */
+/*  Bereich . . . : RUNCLSTM                                           */
+/*  Objekt  . . . : RUNCLSTME                                          */
+/*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         ) Eng  */
+/*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
+/*  Datum . . . . : 03.08.2000                                         */
+/*                                                                     */
+/* =================================================================== */
+/*                                                                     */
+/*  This software is free software, you can redistribute it and/or     */
+/*  modify it under the terms of the GNU General Public License (GPL)  */
+/*  as published by the Free Software Foundation.                      */
+/*                                                                     */
+/*  See GNU General Public License for details.                        */
+/*          http://www.opensource.org                                  */
+/*          http://www.opensource.org/licenses/gpl-license.html        */
+/*                                                                     */
+/* =================================================================== */
+/*  History:                                                           */
+/*                                                                     */
+/*  Datum       Name          Änderung                                 */
+/*  ----------  ------------  ---------------------------------------  */
+/*                                                                     */
+/* =================================================================== */
+/* >>PRE-COMPILER<<                                                    */
+/*                                                                     */
+/*   >>CRTCMD<< CRTCMD       CMD(&LI/&OB) +                            */
+/*                           SRCFILE(&SL/&SF) +                        */
+/*                           SRCMBR(&SM);                              */
+/*                                                                     */
+/*   >>COMPILE<<                                                       */
+/*     >>PARM<< PGM(*LIBL/RUNCLSTM);                                   */
+/*     >>PARM<< HLPPNLGRP(*LIBL/RUNCLSTMPE);                           */
+/*     >>PARM<< HLPID(RUNCLSTM);                                       */
+/*     >>PARM<< PRDLIB(&LI);                                           */
+/*   >>END-COMPILE<<                                                   */
+/*                                                                     */
+/*   >>EXECUTE<<                                                       */
+/*                                                                     */
+/* >>END-PRE-COMPILER<<                                                */
+/* =================================================================== */
+
+             CMD        PROMPT('Run CL-Statements')
+
+             PARM       KWD(USESRCFILE) TYPE(QUAL1)        +
+                        MIN(1)                             +
+                        PROMPT('Source file')
+
+             PARM       KWD(USESRCMBR ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(1)                           +
+                          PROMPT('Source member')
+
+             PARM       KWD(STRSEQ    ) TYPE(*DEC )        +
+                          LEN(6 2)                         +
+                          MIN(0)                           +
+                          DFT(*FIRST)                      +
+                          SPCVAL((*FIRST 0))               +
+                          PROMPT('Start sequence number')
+
+             PARM       KWD(ENDSEQ    ) TYPE(*DEC )        +
+                          LEN(6 2)                         +
+                          MIN(0)                           +
+                          DFT(*LAST)                       +
+                          SPCVAL((*LAST  9999,99))         +
+                          PROMPT('End sequence number')
+
+             PARM       KWD(LIB       ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for library        (&LI)')
+
+             PARM       KWD(OBJ       ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for object         (&OB)')
+
+             PARM       KWD(TYPECODE  ) TYPE(*CHAR)        +
+                          LEN(6)                           +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for type cde       (&TY)')
+
+             PARM       KWD(SRCLIB    ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for source library (&SL)')
+
+             PARM       KWD(SRCFILE   ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for source file    (&SF)')
+
+             PARM       KWD(SRCMBR    ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for source member  (&SM)')
+
+             PARM       KWD(TESTLIB   ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for test library   (&TL)')
+
+             PARM       KWD(TESTOBJ   ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for test object    (&TO)')
+
+             PARM       KWD(TGTRLS    ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for target release (&TR)')
+
+             PARM       KWD(FRMSRCLIB ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for from src.lib.  (&FL)')
+
+             PARM       KWD(FRMSRCFILE) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for from src. file (&FF)')
+
+             PARM       KWD(FRMSRCMBR ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for from src. mbr. (&FM)')
+
+             PARM       KWD(USER0     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U0)')
+
+             PARM       KWD(USER1     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U1)')
+
+             PARM       KWD(USER2     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U2)')
+
+             PARM       KWD(USER3     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U3)')
+
+             PARM       KWD(USER4     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U4)')
+
+             PARM       KWD(USER5     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U5)')
+
+             PARM       KWD(USER6     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U6)')
+
+             PARM       KWD(USER7     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U7)')
+
+             PARM       KWD(USER8     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U8)')
+
+             PARM       KWD(USER9     ) TYPE(*CHAR)        +
+                          LEN(30)                          +
+                          MIN(0)                           +
+                          DFT(*NONE)                       +
+                          SPCVAL((*NONE))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('Value for user-def. par. (&U9)')
+
+             PARM       KWD(MSGF      ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          CONSTANT(RUNCLSTME)
+
+             PARM       KWD(NAMING    ) TYPE(*CHAR)        +
+                          LEN(10)                          +
+                          MIN(0)                           +
+                          DFT(*SYS)                        +
+                          RSTD(*YES)                       +
+                          SPCVAL((*SYS )                   +
+                                 (*SQL ))                  +
+                          PMTCTL(*PMTRQS)                  +
+                          PROMPT('SQL Naming convention')
+
+ QUAL1:      QUAL       TYPE(*NAME) LEN(10) MIN(1)
+             QUAL       TYPE(*NAME) LEN(10) DFT(*LIBL)     +
+                          SPCVAL((*LIBL) (*CURLIB))        +
+                          PROMPT('Library')
+
+]]>  </copysrc>
+</mbr>
+<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
+Installing RUNCLSTMF  type BND - in progress.
+]]>  </sendmsg>
+<!-- START OF MEMBER  -->
+<mbr
+mbrname =  "RUNCLSTMF "
+mbrtype =  "BND       "
+mbrtext =  "Tool: RUNCLSTM   (Run CL Statements         )     "
+srcfile =  "QRUNCLSTM "
+srclib  =  "selected  "
+srclen  =  "00112"
+srccssid=  "00273">
+<copysrc><![CDATA[
+     /* =================================================================== */
+     /*                                                                     */
+     /*  Kurzdokumentation :                                                */
+     /*                                                                     */
+     /*  Bereich . . . : RUNCLSTM                                           */
+     /*  Objekt  . . . : RUNCLSTMF                                          */
+     /*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      */
+     /*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
+     /*  Datum . . . . : 03.08.2000                                         */
+     /*                                                                     */
+     /* =================================================================== */
+
+             STRPGMEXP  PGMLVL(*CURRENT) LVLCHK(*YES) SIGNATURE(*GEN)
+
+                EXPORT SYMBOL(f_cmpMonMsgId  )
+                EXPORT SYMBOL(f_execute      )
+                EXPORT SYMBOL(f_opnSql       )
+                EXPORT SYMBOL(f_executeSQL   )
+                EXPORT SYMBOL(p_cloSql       )
+                EXPORT SYMBOL(f_exist        )
+                EXPORT SYMBOL(f_fmtCmd       )
+                EXPORT SYMBOL(f_getApiErrMsg )
+                EXPORT SYMBOL(f_isApiErr     )
+                EXPORT SYMBOL(f_newErrCode   )
+                EXPORT SYMBOL(f_newMsg       )
+                EXPORT SYMBOL(f_right        )
+                EXPORT SYMBOL(f_rmvRemCl     )
+
+                EXPORT SYMBOL(p_endPgmAbn    )
+                EXPORT SYMBOL(p_sndPgmMsg    )
+
+                EXPORT SYMBOL(p_setMsgFile   )
+                EXPORT SYMBOL(f_getMsgFile   )
+                EXPORT SYMBOL(f_getMsgFileLib)
+
+             ENDPGMEXP
 ]]>  </copysrc>
 </mbr>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
@@ -1767,7 +2434,7 @@ srccssid=  "00273">
      D  i_clString                32767A   value
      D                                     varying
       *
-      *  Ã–ffnen SQL
+      *  Öffnen SQL
      D f_opnSQL        PR                         like(bool_t    )
      D  i_naming                           const  like(naming_t  )
      D  o_msg                                     like(msg_t     )
@@ -1778,7 +2445,7 @@ srccssid=  "00273">
      D                                     options(*varsize)
      D  o_msg                                     like(msg_t     )
       *
-      *  SchlieÃŸen SQL
+      *  Schließen SQL
      D p_cloSQL        PR
       *
      D f_execute...
@@ -2032,57 +2699,6 @@ srccssid=  "00273">
 ]]>  </copysrc>
 </mbr>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
-Installing RUNCLSTMF  type BND - in progress.
-]]>  </sendmsg>
-<!-- START OF MEMBER  -->
-<mbr
-mbrname =  "RUNCLSTMF "
-mbrtype =  "BND       "
-mbrtext =  "Tool: RUNCLSTM   (Run CL Statements         )     "
-srcfile =  "QRUNCLSTM "
-srclib  =  "selected  "
-srclen  =  "00112"
-srccssid=  "00273">
-<copysrc><![CDATA[
-     /* =================================================================== */
-     /*                                                                     */
-     /*  Kurzdokumentation :                                                */
-     /*                                                                     */
-     /*  Bereich . . . : RUNCLSTM                                           */
-     /*  Objekt  . . . : RUNCLSTMF                                          */
-     /*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      */
-     /*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
-     /*  Datum . . . . : 03.08.2000                                         */
-     /*                                                                     */
-     /* =================================================================== */
-
-             STRPGMEXP  PGMLVL(*CURRENT) LVLCHK(*YES) SIGNATURE(*GEN)
-
-                EXPORT SYMBOL(f_cmpMonMsgId  )
-                EXPORT SYMBOL(f_execute      )
-                EXPORT SYMBOL(f_opnSql       )
-                EXPORT SYMBOL(f_executeSQL   )
-                EXPORT SYMBOL(p_cloSql       )
-                EXPORT SYMBOL(f_exist        )
-                EXPORT SYMBOL(f_fmtCmd       )
-                EXPORT SYMBOL(f_getApiErrMsg )
-                EXPORT SYMBOL(f_isApiErr     )
-                EXPORT SYMBOL(f_newErrCode   )
-                EXPORT SYMBOL(f_newMsg       )
-                EXPORT SYMBOL(f_right        )
-                EXPORT SYMBOL(f_rmvRemCl     )
-
-                EXPORT SYMBOL(p_endPgmAbn    )
-                EXPORT SYMBOL(p_sndPgmMsg    )
-
-                EXPORT SYMBOL(p_setMsgFile   )
-                EXPORT SYMBOL(f_getMsgFile   )
-                EXPORT SYMBOL(f_getMsgFileLib)
-
-             ENDPGMEXP
-]]>  </copysrc>
-</mbr>
-<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
 Installing RUNCLSTMP  type PNLGRP - in progress.
 ]]>  </sendmsg>
 <!-- START OF MEMBER  -->
@@ -2118,7 +2734,7 @@ srccssid=  "00273">
 .*=====================================================================*
 .*  History:                                                           *
 .*                                                                     *
-.*  Datum       Name          Ã„nderung                                 *
+.*  Datum       Name          Änderung                                 *
 .*  ----------  ------------  ---------------------------------------  *
 .*                                                                     *
 .*=====================================================================*
@@ -2176,27 +2792,27 @@ srccssid=  "00273">
 .*  Primary help text for the command.
 .*****************************************************************
 :HELP NAME='RUNCLSTM'.
-CL-Anweisungen ausfÃ¼hren - Hilfe
+CL-Anweisungen ausführen - Hilfe
 :P.
-Der Befehl RUNCLSTM dient zur AusfÃ¼hrung von OS/400 CL-Befehlen, die
+Der Befehl RUNCLSTM dient zur Ausführung von OS/400 CL-Befehlen, die
 in einer Quellenteildatei hinterlegt sind.
 :P.
-Neben der AusfÃ¼hrung von CL-Befehlen kÃ¶nnen auch SQL-Anweisungen
-ausgefÃ¼hrt werden (embedded-SQL).
+Neben der Ausführung von CL-Befehlen können auch SQL-Anweisungen
+ausgeführt werden (embedded-SQL).
 :P.
-Obwohl der Befehl RUNCLSTM ursprÃ¼nglich entwickelt worden ist, um
-die eingesetzte Change Management Software an eigene BedÃ¼rfnisse
+Obwohl der Befehl RUNCLSTM ursprünglich entwickelt worden ist, um
+die eingesetzte Change Management Software an eigene Bedürfnisse
 anzupassen, kann er auch ausserhalb der Change Management Software
 verwendet werden und gute Dienste leisten.
 :P.
-Folgende Direktiven werden unterstÃ¼tzt:
+Folgende Direktiven werden unterstützt:
 :P.
 :PARML.
 :PT./EXEC SQL
 :PD.Diese Directive kennzeichnet den Anfang eines SQL-Blocks.
 Hiermit wird quasi in den SQL-Modus umgeschaltet. Fortsetzungszeilen
-werden, wie in CL Ã¼blich mit '+' oder '-' gekennzeichnet. Das sonst
-Ã¼bliche Semikolon als Endekennzeichen einer SQL-Anweisung entfÃ¤llt.
+werden, wie in CL üblich mit '+' oder '-' gekennzeichnet. Das sonst
+übliche Semikolon als Endekennzeichen einer SQL-Anweisung entfällt.
 
 :PT./END-EXEC
 :PD.Diese Direktive kennzeichnet das Ende eines SQL-Blocks. Hiermit
@@ -2205,18 +2821,18 @@ wird der CL-Modus re-aktiviert.
 :P.
 :HP3.Achtung::EHP3.
 :P.
-Der CL-Befehl :HP2.MONMSG:EHP2. wird nur eingeschrÃ¤nkt unterstÃ¼tzt. Zur
-Zeit wird nur das SchlÃ¼sselwort :HP2.MSGID:EHP2. erkannt und
-verarbeitet. Die SchlÃ¼sselworte CMPDTA und EXEC werden nicht
+Der CL-Befehl :HP2.MONMSG:EHP2. wird nur eingeschränkt unterstützt. Zur
+Zeit wird nur das Schlüsselwort :HP2.MSGID:EHP2. erkannt und
+verarbeitet. Die Schlüsselworte CMPDTA und EXEC werden nicht
 erkannt und verarbeitet.
 :P.
-Der MONMSG Befehl kann auch fÃ¼r die Ãœberwachung von SQL-Anweisungen
+Der MONMSG Befehl kann auch für die Überwachung von SQL-Anweisungen
 benutzt werden.
 :P.
 Der MONMSG Befehl kann auch generische Nachrichten wie CPF9800 oder
-CPF000 Ã¼berwachen.
+CPF000 überwachen.
 :P.
-Eine globale NachrichtenÃ¼berwachung ist nicht mÃ¶glich.
+Eine globale Nachrichtenüberwachung ist nicht möglich.
 :P.
 Beispiel:
 :P.
@@ -2248,8 +2864,8 @@ Beispiel:
 Quellendatei (USESRCFILE) - Hilfe
 :XH3.Quellendatei (USESRCFILE)
 :P.
-Name der Datei, welche die Teildatei mit den auszufÃ¼hrenden
-CL-Befehle und SQL-Anweisungen enthÃ¤lt.
+Name der Datei, welche die Teildatei mit den auszuführenden
+CL-Befehle und SQL-Anweisungen enthält.
 :IMHELP name='COM/REQPARM'.
 :P.
 :IMHELP name='COM/VALUES'.
@@ -2259,9 +2875,9 @@ CL-Befehle und SQL-Anweisungen enthÃ¤lt.
 :PD.Name der Datei.
 
 :PT.:PK DEF.*LIBL:EPK.
-:PD.Datei wird Ã¼ber die Bibliotheksliste gesucht.
+:PD.Datei wird über die Bibliotheksliste gesucht.
 :PT.:PV.Bibliothek:EPV.
-:PD.Name der Bibliothek, welche die Datei enthÃ¤lt.
+:PD.Name der Bibliothek, welche die Datei enthält.
 :EPARML.
 
 :EHELP.
@@ -2273,8 +2889,8 @@ CL-Befehle und SQL-Anweisungen enthÃ¤lt.
 Teildatei (USESRCMBR) - Hilfe
 :XH3.Teildatei (USESRCMBR)
 :P.
-Name der Teildatei, welche die auszufÃ¼hrenden CL-Befehle
-und SQL-Anweisungen enthÃ¤lt.
+Name der Teildatei, welche die auszuführenden CL-Befehle
+und SQL-Anweisungen enthält.
 :IMHELP name='COM/REQPARM'.
 :P.
 :IMHELP name='COM/VALUES'.
@@ -2293,16 +2909,16 @@ Name der Teildatei.
 Startzeilennummer (STRSEQ) - Hilfe
 :XH3.Startzeilennummer (STRSEQ)
 :P.
-Erste auszufÃ¼hrende Zeilennummer in der Teildatei.
+Erste auszuführende Zeilennummer in der Teildatei.
 :IMHELP name='COM/REQPARM'.
 :P.
 :IMHELP name='COM/VALUES'.
 
 :PARML.
 :PT.:PK DEF.*FIRST:EPK.
-:PD.Die AusfÃ¼hrung startet mit der ersten Zeile der Teildatei.
+:PD.Die Ausführung startet mit der ersten Zeile der Teildatei.
 :PT.:PV.Startzeilennummer:EPV.
-:PD.Zeilennummer der ersten auszufÃ¼hrenden Anweisung.
+:PD.Zeilennummer der ersten auszuführenden Anweisung.
 :EPARML.
 
 :EHELP.
@@ -2314,16 +2930,16 @@ Erste auszufÃ¼hrende Zeilennummer in der Teildatei.
 Endezeilennummer (ENDSEQ) - Hilfe
 :XH3.Endezeilennummer (ENDSEQ)
 :P.
-Letzte auszufÃ¼hrende Zeilennummer in der Teildatei.
+Letzte auszuführende Zeilennummer in der Teildatei.
 :IMHELP name='COM/REQPARM'.
 :P.
 :IMHELP name='COM/VALUES'.
 
 :PARML.
 :PT.:PK DEF.*LAST:EPK.
-:PD.Die AusfÃ¼hrung endet mit der letzten Zeile der Teildatei.
+:PD.Die Ausführung endet mit der letzten Zeile der Teildatei.
 :PT.:PV.Startzeilennummer:EPV.
-:PD.Zeilennummer der letzen auszufÃ¼hrenden Anweisung.
+:PD.Zeilennummer der letzen auszuführenden Anweisung.
 :EPARML.
 
 :EHELP.
@@ -2332,10 +2948,10 @@ Letzte auszufÃ¼hrende Zeilennummer in der Teildatei.
 .*  Keyword:  LIB (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/LIB'.
-Wert fÃ¼r Bibliothek      (&LI) (LIB) - Hilfe
-:XH3.Wert fÃ¼r Bibliothek      (&LI) (LIB)
+Wert für Bibliothek      (&LI) (LIB) - Hilfe
+:XH3.Wert für Bibliothek      (&LI) (LIB)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Bibliothek' (&LI) eingetragen
+Wert, der für die Ersatzvariable 'Bibliothek' (&LI) eingetragen
 werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2354,10 +2970,10 @@ werden soll.
 .*  Keyword:  OBJ (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/OBJ'.
-Wert fÃ¼r Objekt          (&OB) (OBJ) - Hilfe
-:XH3.Wert fÃ¼r Objekt          (&OB) (OBJ)
+Wert für Objekt          (&OB) (OBJ) - Hilfe
+:XH3.Wert für Objekt          (&OB) (OBJ)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Objekt' (&OBJ) eingetragen
+Wert, der für die Ersatzvariable 'Objekt' (&OBJ) eingetragen
 werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2376,10 +2992,10 @@ werden soll.
 .*  Keyword:  TYPECODE (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/TYPECODE'.
-Wert fÃ¼r Type Code       (&TY) (TYPECODE) - Hilfe
-:XH3.Wert fÃ¼r Type Code       (&TY) (TYPECODE)
+Wert für Type Code       (&TY) (TYPECODE) - Hilfe
+:XH3.Wert für Type Code       (&TY) (TYPECODE)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Type Code' (&TY) eingetragen
+Wert, der für die Ersatzvariable 'Type Code' (&TY) eingetragen
 werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2398,10 +3014,10 @@ werden soll.
 .*  Keyword:  SRCLIB (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/SRCLIB'.
-Wert fÃ¼r Quellenbibl.    (&SL) (SRCLIB) - Hilfe
-:XH3.Wert fÃ¼r Quellenbibl.    (&SL) (SRCLIB)
+Wert für Quellenbibl.    (&SL) (SRCLIB) - Hilfe
+:XH3.Wert für Quellenbibl.    (&SL) (SRCLIB)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Quellenbibliothek' (&SL) eingetragen
+Wert, der für die Ersatzvariable 'Quellenbibliothek' (&SL) eingetragen
 werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2420,10 +3036,10 @@ werden soll.
 .*  Keyword:  SRCFILE (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/SRCFILE'.
-Wert fÃ¼r Quellendatei    (&SF) (SRCFILE) - Hilfe
-:XH3.Wert fÃ¼r Quellendatei    (&SF) (SRCFILE)
+Wert für Quellendatei    (&SF) (SRCFILE) - Hilfe
+:XH3.Wert für Quellendatei    (&SF) (SRCFILE)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Quellendatei' (&SF) eingetragen
+Wert, der für die Ersatzvariable 'Quellendatei' (&SF) eingetragen
 werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2442,10 +3058,10 @@ werden soll.
 .*  Keyword:  SRCMBR (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/SRCMBR'.
-Wert fÃ¼r Quell.Teildatei (&SM) (SRCMBR) - Hilfe
-:XH3.Wert fÃ¼r Quell.Teildatei (&SM) (SRCMBR)
+Wert für Quell.Teildatei (&SM) (SRCMBR) - Hilfe
+:XH3.Wert für Quell.Teildatei (&SM) (SRCMBR)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Quellenteildatei' (&SM)
+Wert, der für die Ersatzvariable 'Quellenteildatei' (&SM)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2464,10 +3080,10 @@ eingetragen werden soll.
 .*  Keyword:  TESTLIB (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/TESTLIB'.
-Wert fÃ¼r Testbibliothek  (&TL) (TESTLIB) - Hilfe
-:XH3.Wert fÃ¼r Testbibliothek  (&TL) (TESTLIB)
+Wert für Testbibliothek  (&TL) (TESTLIB) - Hilfe
+:XH3.Wert für Testbibliothek  (&TL) (TESTLIB)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Testbibliothek' (&TL)
+Wert, der für die Ersatzvariable 'Testbibliothek' (&TL)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2486,10 +3102,10 @@ eingetragen werden soll.
 .*  Keyword:  TESTOBJ (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/TESTOBJ'.
-Wert fÃ¼r Testobjekt      (&TO) (TESTOBJ) - Hilfe
-:XH3.Wert fÃ¼r Testobjekt      (&TO) (TESTOBJ)
+Wert für Testobjekt      (&TO) (TESTOBJ) - Hilfe
+:XH3.Wert für Testobjekt      (&TO) (TESTOBJ)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Testobjekt' (&TO)
+Wert, der für die Ersatzvariable 'Testobjekt' (&TO)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2508,10 +3124,10 @@ eingetragen werden soll.
 .*  Keyword:  TGTRLS (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/TGTRLS'.
-Wert fÃ¼r Zielrelease     (&TR) (TGTRLS) - Hilfe
-:XH3.Wert fÃ¼r Zielrelease     (&TR) (TGTRLS)
+Wert für Zielrelease     (&TR) (TGTRLS) - Hilfe
+:XH3.Wert für Zielrelease     (&TR) (TGTRLS)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'Zielrelease' (&TR)
+Wert, der für die Ersatzvariable 'Zielrelease' (&TR)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2530,10 +3146,10 @@ eingetragen werden soll.
 .*  Keyword:  FRMSRCLIB (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/FRMSRCLIB'.
-Wert fÃ¼r Von-Quellenbibl.(&FL) (FRMSRCLIB) - Hilfe
-:XH3.Wert fÃ¼r Von-Quellenbibl.(&FL) (FRMSRCLIB)
+Wert für Von-Quellenbibl.(&FL) (FRMSRCLIB) - Hilfe
+:XH3.Wert für Von-Quellenbibl.(&FL) (FRMSRCLIB)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'von Quellenbibliothek' (&FL) eingetragen
+Wert, der für die Ersatzvariable 'von Quellenbibliothek' (&FL) eingetragen
 werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2552,10 +3168,10 @@ werden soll.
 .*  Keyword:  FRMSRCFILE (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/FRMSRCFILE'.
-Wert fÃ¼r Von-Quellendatei(&FF) (FRMSRCFILE) - Hilfe
-:XH3.Wert fÃ¼r Von-Quellendatei(&FF) (FRMSRCFILE)
+Wert für Von-Quellendatei(&FF) (FRMSRCFILE) - Hilfe
+:XH3.Wert für Von-Quellendatei(&FF) (FRMSRCFILE)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'von Quellendatei' (&FF) eingetragen
+Wert, der für die Ersatzvariable 'von Quellendatei' (&FF) eingetragen
 werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2574,10 +3190,10 @@ werden soll.
 .*  Keyword:  FRMSRCMBR (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/FRMSRCMBR'.
-Wert fÃ¼r Von-Quell.Teild.(&FM) (FRMSRCMBR) - Hilfe
-:XH3.Wert fÃ¼r Von-Quell.Teild.(&FM) (FRMSRCMBR)
+Wert für Von-Quell.Teild.(&FM) (FRMSRCMBR) - Hilfe
+:XH3.Wert für Von-Quell.Teild.(&FM) (FRMSRCMBR)
 :P.
-Wert, der fÃ¼r die Ersatzvariable 'von Quellenteildatei' (&FM)
+Wert, der für die Ersatzvariable 'von Quellenteildatei' (&FM)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2596,10 +3212,10 @@ eingetragen werden soll.
 .*  Keyword:  USER0 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER0'.
-Wert fÃ¼r Parameter       (&U0) (USER0) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U0) (USER0)
+Wert für Parameter       (&U0) (USER0) - Hilfe
+:XH3.Wert für Parameter       (&U0) (USER0)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 0 (&U0)
+Wert, der für die benutzerdefinierte Ersatzvariable 0 (&U0)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2609,7 +3225,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 0:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 0 (&U0).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 0 (&U0).
 :EPARML.
 
 :EHELP.
@@ -2618,10 +3234,10 @@ eingetragen werden soll.
 .*  Keyword:  USER1 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER1'.
-Wert fÃ¼r Parameter       (&U1) (USER1) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U1) (USER1)
+Wert für Parameter       (&U1) (USER1) - Hilfe
+:XH3.Wert für Parameter       (&U1) (USER1)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 1 (&U1)
+Wert, der für die benutzerdefinierte Ersatzvariable 1 (&U1)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2631,7 +3247,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 1:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 1 (&U1).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 1 (&U1).
 :EPARML.
 
 :EHELP.
@@ -2640,10 +3256,10 @@ eingetragen werden soll.
 .*  Keyword:  USER2 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER2'.
-Wert fÃ¼r Parameter       (&U2) (USER2) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U2) (USER2)
+Wert für Parameter       (&U2) (USER2) - Hilfe
+:XH3.Wert für Parameter       (&U2) (USER2)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 2 (&U2)
+Wert, der für die benutzerdefinierte Ersatzvariable 2 (&U2)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2653,7 +3269,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 2:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 2 (&U2).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 2 (&U2).
 :EPARML.
 
 :EHELP.
@@ -2662,10 +3278,10 @@ eingetragen werden soll.
 .*  Keyword:  USER3 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER3'.
-Wert fÃ¼r Parameter       (&U3) (USER3) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U3) (USER3)
+Wert für Parameter       (&U3) (USER3) - Hilfe
+:XH3.Wert für Parameter       (&U3) (USER3)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 3 (&U3)
+Wert, der für die benutzerdefinierte Ersatzvariable 3 (&U3)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2675,7 +3291,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 3:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 3 (&U3).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 3 (&U3).
 :EPARML.
 
 :EHELP.
@@ -2684,10 +3300,10 @@ eingetragen werden soll.
 .*  Keyword:  USER4 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER4'.
-Wert fÃ¼r Parameter       (&U4) (USER4) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U4) (USER4)
+Wert für Parameter       (&U4) (USER4) - Hilfe
+:XH3.Wert für Parameter       (&U4) (USER4)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 4 (&U4)
+Wert, der für die benutzerdefinierte Ersatzvariable 4 (&U4)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2697,7 +3313,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 4:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 4 (&U4).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 4 (&U4).
 :EPARML.
 
 :EHELP.
@@ -2706,10 +3322,10 @@ eingetragen werden soll.
 .*  Keyword:  USER5 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER5'.
-Wert fÃ¼r Parameter       (&U5) (USER5) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U5) (USER5)
+Wert für Parameter       (&U5) (USER5) - Hilfe
+:XH3.Wert für Parameter       (&U5) (USER5)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 5 (&U5)
+Wert, der für die benutzerdefinierte Ersatzvariable 5 (&U5)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2719,7 +3335,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 5:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 5 (&U5).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 5 (&U5).
 :EPARML.
 
 :EHELP.
@@ -2728,10 +3344,10 @@ eingetragen werden soll.
 .*  Keyword:  USER6 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER6'.
-Wert fÃ¼r Parameter       (&U6) (USER6) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U6) (USER6)
+Wert für Parameter       (&U6) (USER6) - Hilfe
+:XH3.Wert für Parameter       (&U6) (USER6)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 6 (&U6)
+Wert, der für die benutzerdefinierte Ersatzvariable 6 (&U6)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2741,7 +3357,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 6:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 6 (&U6).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 6 (&U6).
 :EPARML.
 
 :EHELP.
@@ -2750,10 +3366,10 @@ eingetragen werden soll.
 .*  Keyword:  USER7 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER7'.
-Wert fÃ¼r Parameter       (&U7) (USER7) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U7) (USER7)
+Wert für Parameter       (&U7) (USER7) - Hilfe
+:XH3.Wert für Parameter       (&U7) (USER7)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 7 (&U7)
+Wert, der für die benutzerdefinierte Ersatzvariable 7 (&U7)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2763,7 +3379,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 7:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 7 (&U7).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 7 (&U7).
 :EPARML.
 
 :EHELP.
@@ -2772,10 +3388,10 @@ eingetragen werden soll.
 .*  Keyword:  USER8 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER8'.
-Wert fÃ¼r Parameter       (&U8) (USER8) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U8) (USER8)
+Wert für Parameter       (&U8) (USER8) - Hilfe
+:XH3.Wert für Parameter       (&U8) (USER8)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 8 (&U8)
+Wert, der für die benutzerdefinierte Ersatzvariable 8 (&U8)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2785,7 +3401,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 8:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 8 (&U8).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 8 (&U8).
 :EPARML.
 
 :EHELP.
@@ -2794,10 +3410,10 @@ eingetragen werden soll.
 .*  Keyword:  USER1 (optional)
 .********************************************
 :HELP NAME='RUNCLSTM/USER9'.
-Wert fÃ¼r Parameter       (&U9) (USER9) - Hilfe
-:XH3.Wert fÃ¼r Parameter       (&U9) (USER9)
+Wert für Parameter       (&U9) (USER9) - Hilfe
+:XH3.Wert für Parameter       (&U9) (USER9)
 :P.
-Wert, der fÃ¼r die benutzerdefinierte Ersatzvariable 9 (&U9)
+Wert, der für die benutzerdefinierte Ersatzvariable 9 (&U9)
 eingetragen werden soll.
 :IMHELP name='COM/OPTPARM'.
 :P.
@@ -2807,7 +3423,7 @@ eingetragen werden soll.
 :PT.:PK DEF.*NONE:EPK.
 :PD.Es ist kein Wert angegeben.
 :PT.:PV.benutzerdefinierte Variable 9:EPV.
-:PD.Wert fÃ¼r die benutzerdefinierte Ersatzvariable 9 (&U9).
+:PD.Wert für die benutzerdefinierte Ersatzvariable 9 (&U9).
 :EPARML.
 
 :EHELP.
@@ -2859,7 +3475,7 @@ Dieser Parameter ist optional.
 .********************************************
 :HELP NAME='COM/VALUES'.
 :P.
-MÃ¶gliche Werte sind:
+Mögliche Werte sind:
 :EHELP.
 
 .*****************************************************************
@@ -2869,9 +3485,6 @@ MÃ¶gliche Werte sind:
 
 ]]>  </copysrc>
 </mbr>
-<compile  condition="GER"><![CDATA[
-CRTPNLGRP PNLGRP(&tolib/RUNCLSTMP) SRCFILE(&tolib/QRUNCLSTM)
-]]>  </compile>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
 Installing RUNCLSTMPE  type PNLGRP - in progress.
 ]]>  </sendmsg>
@@ -2879,7 +3492,7 @@ Installing RUNCLSTMPE  type PNLGRP - in progress.
 <mbr
 mbrname =  "RUNCLSTMPE"
 mbrtype =  "PNLGRP    "
-mbrtext =  "Tool: RUNCLSTM   (Run CL Statements         ) Ger "
+mbrtext =  "Tool: RUNCLSTM   (Run CL Statements         ) Eng "
 srcfile =  "QRUNCLSTM "
 srclib  =  "selected  "
 srclen  =  "00112"
@@ -2908,7 +3521,7 @@ srccssid=  "00273">
 .*=====================================================================*
 .*  History:                                                           *
 .*                                                                     *
-.*  Datum       Name          Ã„nderung                                 *
+.*  Datum       Name          Änderung                                 *
 .*  ----------  ------------  ---------------------------------------  *
 .*                                                                     *
 .*=====================================================================*
@@ -3452,9 +4065,6 @@ The possible values are:
 
 ]]>  </copysrc>
 </mbr>
-<compile  condition="ENG"><![CDATA[
-CRTPNLGRP PNLGRP(&tolib/RUNCLSTMPE) SRCFILE(&tolib/QRUNCLSTM)
-]]>  </compile>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
 Installing RUNCLSTMR1  type RPGLE - in progress.
 ]]>  </sendmsg>
@@ -3491,7 +4101,7 @@ srccssid=  "00273">
       *=====================================================================*
       *  History:                                                           *
       *                                                                     *
-      *  Datum       Name          Ã„nderung                                 *
+      *  Datum       Name          Änderung                                 *
       *  ----------  ------------  ---------------------------------------  *
       *  12.04.2005  Th.Raddatz    Fixed Problem that variables were not    *
       *                            replaced for MONMSG statements.          *
@@ -3859,7 +4469,7 @@ srccssid=  "00273">
       *
      C                   Eval      qFile = i_qFile
       *
-      *  Laden Werte fÃ¼r Ersatzvariablen
+      *  Laden Werte für Ersatzvariablen
      C                   Eval      rplVarData.xLib        = i_xLib
      C                   Eval      rplVarData.xObj        = i_xObj
      C                   Eval      rplVarData.xTypeCode   = i_xTypeCode
@@ -3913,7 +4523,7 @@ srccssid=  "00273">
      C                   Callp     p_endPgmAbn(errMsg)
      C                   Endif
       *
-      *  Wenn die Datei nicht Ã¼berschreiben werden kann, ...
+      *  Wenn die Datei nicht überschreiben werden kann, ...
      C                   Eval      clCmdString = 'OVRDBF FILE('    +
      C                                           'SCRIPT'          +
      C                                           ') '              +
@@ -3950,35 +4560,35 @@ srccssid=  "00273">
      C                   Iter
      C                   Endif
       *
-      *  Ãœberlesen MONMSG ...
+      *  Überlesen MONMSG ...
      C                   Callp     f_rtvCmdToken(cmdString :
      C                                           cmdToken  )
      C                   If        f_ucase(cmdToken) = 'MONMSG'
      C                   Iter
      C                   Endif
       *
-      *  Ãœberlesen PGM ...
+      *  Überlesen PGM ...
      C                   Callp     f_rtvCmdToken(cmdString :
      C                                           cmdToken  )
      C                   If        f_ucase(cmdToken) = 'PGM'
      C                   Iter
      C                   Endif
       *
-      *  Ãœberlesen DCL ...
+      *  Überlesen DCL ...
      C                   Callp     f_rtvCmdToken(cmdString :
      C                                           cmdToken  )
      C                   If        f_ucase(cmdToken) = 'DCL'
      C                   Iter
      C                   Endif
       *
-      *  Ãœberlesen ENDPGM ...
+      *  Überlesen ENDPGM ...
      C                   Callp     f_rtvCmdToken(cmdString :
      C                                           cmdToken  )
      C                   If        f_ucase(cmdToken) = 'ENDPGM'
      C                   Iter
      C                   Endif
       *
-      *  PrÃ¼fen Betriebsartenumschaltung auf ...
+      *  Prüfen Betriebsartenumschaltung auf ...
       *  ... starten SQL
      C                   If        cmdString = cBeginSQL
       *      Wenn die Betriebsart SQL bereits eingestellt ist, ...
@@ -4046,7 +4656,7 @@ srccssid=  "00273">
       *  Ersetzen Variablen ...
      C                   Eval      cmdString = f_rplVars(cmdString: rplVarData)
       *
-      *  AusfÃ¼hren ...
+      *  Ausführen ...
      C                   Select
       *  ... CL-Befehl
      C                   When      mode = cCLP
@@ -4109,7 +4719,7 @@ srccssid=  "00273">
      C                                               '*LIBL'        )
      C                   Callp     p_endPgmAbn(errMsg)
      C                   Endif
-      *  ... ungÃ¼ltiger Modus
+      *  ... ungültiger Modus
      C                   Other
      C                   Endsl
       *
@@ -4122,7 +4732,7 @@ srccssid=  "00273">
      C                   Eval      g_isSqlOpn = cFalse
      C                   Endif
       *
-      *  Wenn die Ãœberschreibungen nicht gelÃ¶scht werden kÃ¶nnen, ...
+      *  Wenn die Überschreibungen nicht gelöscht werden können, ...
      C                   Eval      clCmdString = 'DLTOVR FILE(' +
      C                                           'SCRIPT'       +
      C                                           ') '           +
@@ -4179,7 +4789,7 @@ srccssid=  "00273">
      C                   Iter
      C                   Endif
       *
-      *  ... Ã¼berlesen, bis Startzeile gefunden ist
+      *  ... überlesen, bis Startzeile gefunden ist
      C                   If        ds_srcSeq < i_strSeq
      C                   Iter
      C                   Endif
@@ -4194,10 +4804,10 @@ srccssid=  "00273">
     R ***
      C                   Endsl
       *
-      *  ... prÃ¼fen auf Fortsetzungszeile
+      *  ... prüfen auf Fortsetzungszeile
      C                   Eval      cmdString = %trimr(cmdString)
       *
-      *  ... prÃ¼fen auf Leerstring
+      *  ... prüfen auf Leerstring
      C                   If        %len(cmdString) = 0
      C                   Iter
      C                   Endif
@@ -4322,7 +4932,7 @@ srccssid=  "00273">
       *
      C                   If        f_rtvCmdParm(cmdString: msgIdStr)
       *
-      *  Extrahieren Daten des SchlÃ¼sselworts MSGID
+      *  Extrahieren Daten des Schlüsselworts MSGID
      C                   Eval      msgIdStr =
      C                             f_rtvKeyWrdDta(f_rtvKeyWrd('MSGID':msgIdStr))
       *
@@ -4436,7 +5046,7 @@ srccssid=  "00273">
      P                 E
       *
       * =============================================================
-      *  Extrahieren BefehlsschlÃ¼sselwort
+      *  Extrahieren Befehlsschlüsselwort
       * =============================================================
      P f_rtvKeyWrd...
      P                 B
@@ -4461,13 +5071,13 @@ srccssid=  "00273">
       *
      C                   Eval      token = %trim(i_keyWrd) + '('
       *
-      *  suchen SchlÃ¼sselwort im vorhandenen Befehlstring
+      *  suchen Schlüsselwort im vorhandenen Befehlstring
      C                   Eval      startPos = %scan(token: i_cmd)
       *
-      *  Wenn das SchlÃ¼sselwort gefunden werden konnte, ...
+      *  Wenn das Schlüsselwort gefunden werden konnte, ...
      C                   If        startPos > 0
       *  ... dann
-      *      ermitteln LÃ¤nge des SchlÃ¼sselwortes ...
+      *      ermitteln Länge des Schlüsselwortes ...
      C                   Eval      x          = startPos + %len(token)
      C                   Eval      numBracket = 1
      C                   Eval      dataLen    = %len(token)
@@ -4493,10 +5103,10 @@ srccssid=  "00273">
       *
      C                   Enddo
       *
-      *      Wenn der KlammernzÃ¤hler <> 0 ist, ...
+      *      Wenn der Klammernzähler <> 0 ist, ...
      C                   If        numBracket <> 0
       *      ... dann
-      *          konnte das Ende des SchlÃ¼sselwortes
+      *          konnte das Ende des Schlüsselwortes
       *          nicht gefunden werden
      C                   Eval      keyWrdStr = ''
      C                   Else
@@ -4513,7 +5123,7 @@ srccssid=  "00273">
      P                 E
       *
       * =============================================================
-      *  Extrahieren BefehlsschlÃ¼sselwort Daten
+      *  Extrahieren Befehlsschlüsselwort Daten
       * =============================================================
      P f_rtvKeyWrdDta...
      P                 B
@@ -4537,14 +5147,14 @@ srccssid=  "00273">
       *
      C                   Eval      token = '('
       *
-      *  suchen SchlÃ¼sselwortdaten im vorhandenen Befehlstring
+      *  suchen Schlüsselwortdaten im vorhandenen Befehlstring
      C                   Eval      startPos = %scan(token: i_keyWrd)
       *
-      *  Wenn das SchlÃ¼sselwort gefunden werden konnte, ...
+      *  Wenn das Schlüsselwort gefunden werden konnte, ...
      C                   If        (startPos > 0)  and
      C                             (f_right(%trimr(i_keyWrd): 1) = ')')
       *  ... dann
-      *      ermitteln LÃ¤nge des SchlÃ¼sselwortes ...
+      *      ermitteln Länge des Schlüsselwortes ...
      C                   Eval      startPos   = startPos + %len(token)
      C                   Eval      endPos     = %len(%trimr(i_keyWrd)) - 1
      C                   Eval      dataLen    = endPos - startPos + 1
@@ -4798,7 +5408,7 @@ srccssid=  "00273">
       *=====================================================================*
       *  History:                                                           *
       *                                                                     *
-      *  Datum       Name          Ã„nderung                                 *
+      *  Datum       Name          Änderung                                 *
       *  ----------  ------------  ---------------------------------------  *
       *                                                                     *
       * =================================================================== *
@@ -4875,14 +5485,14 @@ srccssid=  "00273">
      D isOK            S                   like(bool_t    )
      D                                     inz
       *
-      *  Definieren Hilfsfelder fÃ¼r optinale Parametergruppe 1
+      *  Definieren Hilfsfelder für optinale Parametergruppe 1
      D  o1_msg         S                   like(msg_t     )
      D                                     inz
       *
-      *  Definieren Hilfsfelder fÃ¼r optinale Parametergruppe 2
+      *  Definieren Hilfsfelder für optinale Parametergruppe 2
      D  i2_typCmdPrc   S             10I 0 inz
       *
-      *  Definieren Parameter fÃ¼r p_getOpDesc
+      *  Definieren Parameter für p_getOpDesc
      D posNr           S                   inz like(int4_t    )
      D descType        S                   inz like(int4_t    )
      D datatype        S                   inz like(int4_t    )
@@ -4891,7 +5501,7 @@ srccssid=  "00273">
      D dataLen         S                   inz like(int4_t    )
      D feedBack        S                   inz like(fc_t      )
       *
-      *  Definitionen fÃ¼r QCAPCMD
+      *  Definitionen für QCAPCMD
      D cmd             S                   like(i_cmd)
      D cmdLen          S             10I 0 inz
      D optCtrl         DS
@@ -4910,7 +5520,7 @@ srccssid=  "00273">
      D errCode         S                   like(errCode_t  )
      D                                     inz
       *
-      *  Hilfsfelder fÃ¼r Funktion: p_TestOmit
+      *  Hilfsfelder für Funktion: p_TestOmit
      D isPresent       S                   like(int4_t      )
      D                                     inz
       *
@@ -4953,12 +5563,12 @@ srccssid=  "00273">
       *
      C                   Eval      o1_msg = f_getAPIErrMsg(errCode)
       *
-      *  eintragen RÃ¼ckgabeparameter ...
+      *  eintragen Rückgabeparameter ...
      C                   If        %parms >= 2
      C                   Eval      o_msg = o1_msg
      C                   Endif
       *
-      *  fÃ¼llen Funktionswert ...
+      *  füllen Funktionswert ...
      C                   If        f_isAPIErr(errCode)
      C                   Eval      isOK = cFalse
      C                   Else
@@ -5020,7 +5630,7 @@ srccssid=  "00273">
      D                                     prefix(errCode_    )
       *-------------------------------------------------------------------*
       *
-      *  ermÃ¶glichen Zugriff auf Einzelfelder von i_errCode
+      *  ermöglichen Zugriff auf Einzelfelder von i_errCode
      C                   Eval      errCode = i_errCode
       *
      C                   If        f_isAPIErr(errCode)
@@ -5057,7 +5667,7 @@ srccssid=  "00273">
      D                                     prefix(errCode_    )
       *-------------------------------------------------------------------*
       *
-      *  ermÃ¶glichen Zugriff auf Einzelfelder von i_errCode
+      *  ermöglichen Zugriff auf Einzelfelder von i_errCode
      C                   Eval      errCode = i_errCode
       *
      C                   If        errCode_bytAvl <> 0
@@ -5097,23 +5707,23 @@ srccssid=  "00273">
      D msg           E DS                  extname(XDMSG     )  inz
      D                                     prefix(msg_       )
       *
-      *  Hilfsfelder fÃ¼r optionale Parametergruppe 1
+      *  Hilfsfelder für optionale Parametergruppe 1
      D i1_msgType      S                   like(i_msgType )
      D                                     inz
       *
-      *  Hilfsfelder fÃ¼r optionale Parametergruppe 2
+      *  Hilfsfelder für optionale Parametergruppe 2
      D i2_msgData      S                   like(I_MsgData )
      D                                     inz
       *
-      *  Hilfsfelder fÃ¼r optionale Parametergruppe 3
+      *  Hilfsfelder für optionale Parametergruppe 3
      D i3_msgF         S                   like(I_MsgF    )
      D                                     inz
       *
-      *  Hilfsfelder fÃ¼r optionale Parametergruppe 4
+      *  Hilfsfelder für optionale Parametergruppe 4
      D i4_msgL         S                   like(I_MsgL    )
      D                                     inz
       *
-      *  Hilfsfelder fÃ¼r Funktion: p_TestOmit
+      *  Hilfsfelder für Funktion: p_TestOmit
      D isPresent       S                   like(int4_t    )
      D                                     inz
       *-------------------------------------------------------------------*
@@ -5191,7 +5801,7 @@ srccssid=  "00273">
      D rightStr        S                   like(string_t  )
      D                                     inz
       *
-      *  Definieren Hilfsfelder fÃ¼r optinale Parametergruppe 1
+      *  Definieren Hilfsfelder für optinale Parametergruppe 1
      D i1_rLen         S                   like(int4_t    )
      D                                     inz
       *
@@ -5255,14 +5865,14 @@ srccssid=  "00273">
       *  Wenn wir uns nicht innerhalb eines Remark befinden, ...
      C                   If        not isClRem
       *  ... dann
-      *      PrÃ¼fen auf Anfang Literalzeichen
+      *      Prüfen auf Anfang Literalzeichen
      C                   If        f_subst(newClStr: x: cLenBegLit) = cBegLit
      C                   Eval      isLiteral = cTrue
      C                   Eval      x = x + cLenBegLit
      C                   Iter
      C                   Endif
       *
-      *      PrÃ¼fen auf Ende Literalzeichen
+      *      Prüfen auf Ende Literalzeichen
      C                   If        f_subst(newClStr: x: cLenEndLit) = cEndLit
      C                   Eval      isLiteral = cTrue
      C                   Eval      x = x + cLenEndLit
@@ -5273,7 +5883,7 @@ srccssid=  "00273">
       *  Wenn wir uns nicht innerhalb eines Literals befinden, ...
      C                   If        not isLiteral
       *  ... dann
-      *      PrÃ¼fen auf Anfang eines Remarks
+      *      Prüfen auf Anfang eines Remarks
      C                   If        f_subst(newClStr: x: cLenBegClRem)= cBegClRem
      C                   If        (x = 1) or
      C                             (%subst(newClStr: x - 1: 1) = ' ')
@@ -5284,7 +5894,7 @@ srccssid=  "00273">
      C                   Endif
      C                   Endif
       *
-      *      PrÃ¼fen auf Ende eines Remarks
+      *      Prüfen auf Ende eines Remarks
      C                   If        f_subst(newClStr: x: cLenEndClRem)= cEndClRem
      C                   If        (x = %len(newClStr) - cLenEndClRem + 1) or
      C                             (%subst(newClStr: x + cLenEndClRem: 1) = ' ')
@@ -5319,7 +5929,7 @@ srccssid=  "00273">
      D                 PI                         like(capcmd_t  )
      D  i_cmd                              value  like(capcmd_t  )
       *
-      *  Definitionen fÃ¼r QCAPCMD
+      *  Definitionen für QCAPCMD
      D cmd             S                   like(i_cmd)
      D cmdLen          S             10I 0 inz(%len(cmd))
      D optCtrl         DS
@@ -5356,12 +5966,12 @@ srccssid=  "00273">
      C                   Parm                    retCmdLenRtn
      C                   Parm                    errCode
       *
-      *  PrÃ¼fen API-Fehler ...
+      *  Prüfen API-Fehler ...
      C                   If        f_isAPIErr(errCode)
      C                   Eval      retCmd = ''
      C                   Else
       *
-      *  PrÃ¼fen LÃ¤nge der Befehlszeichenkette ...
+      *  Prüfen Länge der Befehlszeichenkette ...
      C                   If        retCmdLenRtn > retCmdLenAvl
      C                   Eval      retCmd = ''
      C                   Endif
@@ -5453,22 +6063,22 @@ srccssid=  "00273">
      D msg           E DS                  extname(XDMSG     )  inz
      D                                     prefix(msg_       )
       *
-      *  Hilfsfelder fÃ¼r optionale Parametergruppe 1
+      *  Hilfsfelder für optionale Parametergruppe 1
      D I1_ToStkC       S                   like(I_ToStkC)     INZ(*ZEROS )
       *
-      *  Hilfsfelder fÃ¼r optionale Parametergruppe 2
+      *  Hilfsfelder für optionale Parametergruppe 2
      D I2_ToProc       S                   like(I_ToProc    ) INZ(*BLANKS)
       *
-      *  Hilfsfelder fÃ¼r optionale Parametergruppe 3
+      *  Hilfsfelder für optionale Parametergruppe 3
      D I3_ToMod        S                   like(I_ToMod   )   INZ(*ZEROS )
       *
-      *  Hilfsfelder fÃ¼r optionale Parametergruppe 4
+      *  Hilfsfelder für optionale Parametergruppe 4
      D I4_ToPgm        S                   like(I_ToPgm)      INZ(*BLANKS)
       *
-      *  Hilfsfelder fÃ¼r System-API: CEETSTA
+      *  Hilfsfelder für System-API: CEETSTA
      D isPresent       S                   like(int4_t)       INZ(*ZEROS)
       *
-      *  Parameterfelder fÃ¼r System-API: QMHSNDPM
+      *  Parameterfelder für System-API: QMHSNDPM
      D p1_MsgID        S              7A                      INZ(*BLANKS)
      D p1_DSMsgFObj    DS            20
      D  p1_DSMsgF              1     10A                      INZ(*BLANKS)
@@ -5488,7 +6098,7 @@ srccssid=  "00273">
      D p1_WaitTime     S                   like(int4_t)       INZ(*ZEROS )
       *-------------------------------------------------------------------*
       *
-      *  ErmÃ¶glichen Zugriff auf Einzelfelder ...
+      *  Ermöglichen Zugriff auf Einzelfelder ...
      C                   Eval      msg = i_msg
       *
       *  Einsetzen der Defaultwerte ...
@@ -5525,7 +6135,7 @@ srccssid=  "00273">
      C                   Eval      i4_toPgm   = i_toPgm
      C                   Endif
       *
-      *  FÃ¼llen Parameterfelder fÃ¼r System-API ...
+      *  Füllen Parameterfelder für System-API ...
       *  Call Stack Counter ...
      C                   Select
       *  ... *EXT
@@ -5548,7 +6158,7 @@ srccssid=  "00273">
       *  ... *
      C                   When      i2_toProc     = cMsg_toMySelf
      C                   Eval      p1_callStkE   = '*'
-      *      ... eigene Prozedur SndPgmMsg Ã¼berspringen
+      *      ... eigene Prozedur SndPgmMsg überspringen
      C                   Eval      p1_callStkCtr = p1_callStkCtr + 1
       *  ... *PGMBDY
      C                   When      i2_toProc     = cMsg_ToPgmBdy
@@ -5595,7 +6205,7 @@ srccssid=  "00273">
      C                   Eval      p1_DSMsgF      = msg_file
      C                   Eval      p1_DSMsgL      = msg_lib
       *
-      *  NachrichtenschlÃ¼ssel ...
+      *  Nachrichtenschlüssel ...
      C                   Eval      p1_msgKey      = ''
       *  Fehlercode ...
      C                   Eval      p1_errCode     = f_newErrCode(cErr_NoMonErr)
@@ -5645,15 +6255,15 @@ srccssid=  "00273">
      D isOK            S                   like(bool_t    )
      D                                     inz
       *
-      *  Definieren Hilfsfelder fÃ¼r optinale Parametergruppe 1
+      *  Definieren Hilfsfelder für optinale Parametergruppe 1
      D  i1_lib         S                   like(lib_t     )
      D                                     inz
       *
-      *  Definieren Hilfsfelder fÃ¼r optinale Parametergruppe 2
+      *  Definieren Hilfsfelder für optinale Parametergruppe 2
      D  i2_mbr         S                   like(mbr_t     )
      D                                     inz
       *
-      *  Hilfsfelder fÃ¼r Funktion: p_TestOmit
+      *  Hilfsfelder für Funktion: p_TestOmit
      D isPresent       S                   like(int4_t      ) INZ(*ZEROS)
       *
       *  Lokale Arbeitsfelder
@@ -5832,7 +6442,7 @@ srccssid=  "00273">
       *=====================================================================*
       *  History:                                                           *
       *                                                                     *
-      *  Datum       Name          Ã„nderung                                 *
+      *  Datum       Name          Änderung                                 *
       *  ----------  ------------  ---------------------------------------  *
       *  03.05.2002  Th.Raddatz    Changed RUNCLSTM to use SQL-CLI.         *
       *  19.06.2002  Th.Raddatz    Fixed error in f_sqlErrMsg() to          *
@@ -6009,7 +6619,7 @@ srccssid=  "00273">
      D isOK            S                   like(bool_t    )
      D                                     inz
       *
-      *  Definieren Parameter fÃ¼r p_getOpDesc
+      *  Definieren Parameter für p_getOpDesc
      D posNr           S                   inz like(int4_t    )
      D descType        S                   inz like(int4_t    )
      D datatype        S                   inz like(int4_t    )
@@ -6018,7 +6628,7 @@ srccssid=  "00273">
      D dataLen         S                   inz like(int4_t    )
      D feedBack        S                   inz like(fc_t      )
       *
-      *  Hilfsfelder fÃ¼r Funktion: p_TestOmit
+      *  Hilfsfelder für Funktion: p_TestOmit
      D isPresent       S                   like(int4_t      )
      D                                     inz
       *
@@ -6033,7 +6643,7 @@ srccssid=  "00273">
       *
      C                   Eval      sqlStmt = %subst(i_sqlStmt: 1: dataLen)
       *
-      *  ausfÃ¼hren SQL Anweisung
+      *  ausführen SQL Anweisung
      C                   Eval      rc = SQLExecDirect(g_hstmt        :
      C                                                %trim(sqlStmt) :
      C                                                SQL_NTS        )
@@ -7941,16 +8551,16 @@ Installing USR0001  type RPGLE - in progress.
 <mbr
 mbrname =  "USR0001   "
 mbrtype =  "RPGLE     "
-mbrtext =  "MSG: LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.      "
+mbrtext =  "MSG: Länge ausserhalb des gültigen Bereichs.      "
 srcfile =  "QRUNCLSTM "
 srclib  =  "selected  "
 srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
       *---------------------------------------------------------------
-      * Datenstruktur fÃ¼r Message-ID : USR0001
+      * Datenstruktur für Message-ID : USR0001
       *
-      * LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.
+      * Länge ausserhalb des gültigen Bereichs.
       *
      D USR0001         DS
       *   Keine Ersatzvariablen definiert!
@@ -7965,16 +8575,16 @@ Installing USR0002  type RPGLE - in progress.
 <mbr
 mbrname =  "USR0002   "
 mbrtype =  "RPGLE     "
-mbrtext =  "MSG: Fehler bei BefehlsausfÃ¼hrung in Zeile  1.    "
+mbrtext =  "MSG: Fehler bei Befehlsausführung in Zeile  1.    "
 srcfile =  "QRUNCLSTM "
 srclib  =  "selected  "
 srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
       *---------------------------------------------------------------
-      * Datenstruktur fÃ¼r Message-ID : USR0002
+      * Datenstruktur für Message-ID : USR0002
       *
-      * Fehler bei BefehlsausfÃ¼hrung in Zeile &1.
+      * Fehler bei Befehlsausführung in Zeile &1.
       *
      D USR0002         DS
      D  USR00021                    006P 2 INZ(*ZEROS )
@@ -7997,7 +8607,7 @@ srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
       *---------------------------------------------------------------
-      * Datenstruktur fÃ¼r Message-ID : USR0003
+      * Datenstruktur für Message-ID : USR0003
       *
       * Die Betriebsart &1 ist bereits eingestellt worden.
       *
@@ -8023,7 +8633,7 @@ srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
       *---------------------------------------------------------------
-      * Datenstruktur fÃ¼r Message-ID : USR0004
+      * Datenstruktur für Message-ID : USR0004
       *
       * Die Betriebsart &1 ist bereits eingestellt worden.
       *
@@ -8035,610 +8645,143 @@ srccssid=  "00273">
       *
 ]]>  </copysrc>
 </mbr>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTRPGMOD MODULE(&tolib/RUNCLSTMS1) SRCFILE(&tolib/QRUNCLSTM) SRCMBR(*MODULE) DBGVIEW(*LIST)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTRPGMOD MODULE(&tolib/RUNCLSTMS2) SRCFILE(&tolib/QRUNCLSTM) SRCMBR(*MODULE) DBGVIEW(*LIST)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTSRVPGM SRVPGM(&tolib/RUNCLSTMS1) MODULE(&tolib/RUNCLSTMS1 &tolib/RUNCLSTMS2) SRCFILE(&tolib/QRUNC
-LSTM) SRCMBR(RUNCLSTMF) TEXT('Tool: RUNCLSCT   (Run CL Statement   )') ACTGRP(*CALLER) DETAIL(*BASIC
-)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTRPGMOD MODULE(&tolib/RUNCLSTMR1) SRCFILE(&tolib/QRUNCLSTM) SRCMBR(*MODULE) DBGVIEW(*LIST)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTPGM PGM(&tolib/RUNCLSTM) MODULE(&tolib/RUNCLSTMR1) ENTMOD(*FIRST) BNDSRVPGM((&tolib/RUNCLSTMS1))
-BNDDIR(*LIBL/QC2LE) ACTGRP(*NEW) DETAIL(*BASIC)
-]]>  </qcmdexc>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
-Installing RUNCLSTM  type CMD - in progress.
+Installing XDERRCODE  type PF - in progress.
 ]]>  </sendmsg>
 <!-- START OF MEMBER  -->
 <mbr
-mbrname =  "RUNCLSTM  "
-mbrtype =  "CMD       "
-mbrtext =  "Tool: RUNCLSTM   (Run CL Statements         ) Ger "
+mbrname =  "XDERRCODE "
+mbrtype =  "PF        "
+mbrtext =  "Ext.DS  : API error code                          "
 srcfile =  "QRUNCLSTM "
 srclib  =  "selected  "
 srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
-/* =================================================================== */
-/*                                                                     */
-/*  Kurzdokumentation :                                                */
-/*                                                                     */
-/*  Bereich . . . : RUNCLSTM                                           */
-/*  Objekt  . . . : RUNCLSTM                                           */
-/*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         ) Ger  */
-/*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
-/*  Datum . . . . : 03.08.2000                                         */
-/*                                                                     */
-/* =================================================================== */
-/*                                                                     */
-/*  This software is free software, you can redistribute it and/or     */
-/*  modify it under the terms of the GNU General Public License (GPL)  */
-/*  as published by the Free Software Foundation.                      */
-/*                                                                     */
-/*  See GNU General Public License for details.                        */
-/*          http://www.opensource.org                                  */
-/*          http://www.opensource.org/licenses/gpl-license.html        */
-/*                                                                     */
-/* =================================================================== */
-/*  History:                                                           */
-/*                                                                     */
-/*  Datum       Name          Ã„nderung                                 */
-/*  ----------  ------------  ---------------------------------------  */
-/*                                                                     */
-/* =================================================================== */
-/* >>PRE-COMPILER<<                                                    */
-/*                                                                     */
-/*   >>CRTCMD<< CRTCMD       CMD(&LI/&OB) +                            */
-/*                           SRCFILE(&SL/&SF) +                        */
-/*                           SRCMBR(&SM);                              */
-/*                                                                     */
-/*   >>COMPILE<<                                                       */
-/*     >>PARM<< PGM(*LIBL/RUNCLSTM);                                   */
-/*     >>PARM<< HLPPNLGRP(*LIBL/RUNCLSTMP);                            */
-/*     >>PARM<< HLPID(RUNCLSTM);                                       */
-/*     >>PARM<< PRDLIB(&LI);                                           */
-/*   >>END-COMPILE<<                                                   */
-/*                                                                     */
-/*   >>EXECUTE<<                                                       */
-/*                                                                     */
-/* >>END-PRE-COMPILER<<                                                */
-/* =================================================================== */
-
-             CMD        PROMPT('CL-Anweisungen ausfÃ¼hren')
-
-             PARM       KWD(USESRCFILE) TYPE(QUAL1)        +
-                        MIN(1)                             +
-                        PROMPT('Quellendatei')
-
-             PARM       KWD(USESRCMBR ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(1)                           +
-                          PROMPT('Teildatei')
-
-             PARM       KWD(STRSEQ    ) TYPE(*DEC )        +
-                          LEN(6 2)                         +
-                          MIN(0)                           +
-                          DFT(*FIRST)                      +
-                          SPCVAL((*FIRST 0))               +
-                          PROMPT('Startzeilennummer')
-
-             PARM       KWD(ENDSEQ    ) TYPE(*DEC )        +
-                          LEN(6 2)                         +
-                          MIN(0)                           +
-                          DFT(*LAST)                       +
-                          SPCVAL((*LAST  9999,99))         +
-                          PROMPT('Endezeilennummer')
-
-             PARM       KWD(LIB       ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Bibliothek      (&LI)')
-
-             PARM       KWD(OBJ       ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Objekt          (&OB)')
-
-             PARM       KWD(TYPECODE  ) TYPE(*CHAR)        +
-                          LEN(6)                           +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Type Code       (&TY)')
-
-             PARM       KWD(SRCLIB    ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Quellenbibl.    (&SL)')
-
-             PARM       KWD(SRCFILE   ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Quellendatei    (&SF)')
-
-             PARM       KWD(SRCMBR    ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Quell.Teildatei (&SM)')
-
-             PARM       KWD(TESTLIB   ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Testbibliothek  (&TL)')
-
-             PARM       KWD(TESTOBJ   ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Testobjekt      (&TO)')
-
-             PARM       KWD(TGTRLS    ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Zielrelease     (&TR)')
-
-             PARM       KWD(FRMSRCLIB ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Von-Quellenbibl.(&FL)')
-
-             PARM       KWD(FRMSRCFILE) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Von-Quellendatei(&FF)')
-
-             PARM       KWD(FRMSRCMBR ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Von-Quell.Teild.(&FM)')
-
-             PARM       KWD(USER0     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U0)')
-
-             PARM       KWD(USER1     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U1)')
-
-             PARM       KWD(USER2     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U2)')
-
-             PARM       KWD(USER3     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U3)')
-
-             PARM       KWD(USER4     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U4)')
-
-             PARM       KWD(USER5     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U5)')
-
-             PARM       KWD(USER6     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U6)')
-
-             PARM       KWD(USER7     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U7)')
-
-             PARM       KWD(USER8     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U8)')
-
-             PARM       KWD(USER9     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert fÃ¼r Parameter       (&U9)')
-
-             PARM       KWD(MSGF      ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          CONSTANT(RUNCLSTM)
-
-             PARM       KWD(NAMING    ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*SYS)                        +
-                          RSTD(*YES)                       +
-                          SPCVAL((*SYS )                   +
-                                 (*SQL ))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('SQL Namenskonvention')
-
- QUAL1:      QUAL       TYPE(*NAME) LEN(10) MIN(1)
-             QUAL       TYPE(*NAME) LEN(10) DFT(*LIBL)     +
-                          SPCVAL((*LIBL) (*CURLIB))        +
-                          PROMPT('Bibliothek')
-
+      * ============================================================= *
+      *   API error code structure                                    *
+      * ============================================================= *
+      *   >>PRE-COMPILER<<                                            *
+      *                                                               *
+      *     >>CRTCMD<<  CRTPF         FILE(&LI/&OB) +                 *
+      *                               SRCFILE(&SL/&SF)  +             *
+      *                               SRCMBR(&SM);                    *
+      *                                                               *
+      *     >>COMPILE<<                                               *
+      *       >>PARM<<                MAXMBRS(1);                     *
+      *       >>PARM<<                MBR(*FILE);                     *
+      *       >>PARM<<                FILETYPE(*DATA);                *
+      *     >>END-COMPILE<<                                           *
+      *                                                               *
+      *     >>EXECUTE<<                                               *
+      *                                                               *
+      *   >>END-PRE-COMPILER<<                                        *
+      *===============================================================*
+      *
+     A          R ERRCODE                   TEXT('API error code structure')
+      *
+     A            BYTPRV         9B 0       TEXT('Bytes Provided ')
+     A            BYTAVL         9B 0       TEXT('Bytes Available')
+     A            EXCID          7A         TEXT('Exception ID   ')
+     A            RES01          1A         TEXT('Reserved       ')
+     A            EXCDTA       256A         TEXT('Exception Data ')
+      *
 ]]>  </copysrc>
 </mbr>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
-Installing RUNCLSTME  type CMD - in progress.
+Installing XDMSG  type PF - in progress.
 ]]>  </sendmsg>
 <!-- START OF MEMBER  -->
 <mbr
-mbrname =  "RUNCLSTME "
-mbrtype =  "CMD       "
-mbrtext =  "Tool: RUNCLSTM   (Run CL Statements         ) Eng "
+mbrname =  "XDMSG     "
+mbrtype =  "PF        "
+mbrtext =  "Ext.DS  : Message                                 "
 srcfile =  "QRUNCLSTM "
 srclib  =  "selected  "
 srclen  =  "00112"
 srccssid=  "00273">
 <copysrc><![CDATA[
-/* =================================================================== */
-/*                                                                     */
-/*  Kurzdokumentation :                                                */
-/*                                                                     */
-/*  Bereich . . . : RUNCLSTM                                           */
-/*  Objekt  . . . : RUNCLSTME                                          */
-/*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         ) Eng  */
-/*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
-/*  Datum . . . . : 03.08.2000                                         */
-/*                                                                     */
-/* =================================================================== */
-/*                                                                     */
-/*  This software is free software, you can redistribute it and/or     */
-/*  modify it under the terms of the GNU General Public License (GPL)  */
-/*  as published by the Free Software Foundation.                      */
-/*                                                                     */
-/*  See GNU General Public License for details.                        */
-/*          http://www.opensource.org                                  */
-/*          http://www.opensource.org/licenses/gpl-license.html        */
-/*                                                                     */
-/* =================================================================== */
-/*  History:                                                           */
-/*                                                                     */
-/*  Datum       Name          Ã„nderung                                 */
-/*  ----------  ------------  ---------------------------------------  */
-/*                                                                     */
-/* =================================================================== */
-/* >>PRE-COMPILER<<                                                    */
-/*                                                                     */
-/*   >>CRTCMD<< CRTCMD       CMD(&LI/&OB) +                            */
-/*                           SRCFILE(&SL/&SF) +                        */
-/*                           SRCMBR(&SM);                              */
-/*                                                                     */
-/*   >>COMPILE<<                                                       */
-/*     >>PARM<< PGM(*LIBL/RUNCLSTM);                                   */
-/*     >>PARM<< HLPPNLGRP(*LIBL/RUNCLSTMPE);                           */
-/*     >>PARM<< HLPID(RUNCLSTM);                                       */
-/*     >>PARM<< PRDLIB(&LI);                                           */
-/*   >>END-COMPILE<<                                                   */
-/*                                                                     */
-/*   >>EXECUTE<<                                                       */
-/*                                                                     */
-/* >>END-PRE-COMPILER<<                                                */
-/* =================================================================== */
-
-             CMD        PROMPT('Run CL-Statements')
-
-             PARM       KWD(USESRCFILE) TYPE(QUAL1)        +
-                        MIN(1)                             +
-                        PROMPT('Source file')
-
-             PARM       KWD(USESRCMBR ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(1)                           +
-                          PROMPT('Source member')
-
-             PARM       KWD(STRSEQ    ) TYPE(*DEC )        +
-                          LEN(6 2)                         +
-                          MIN(0)                           +
-                          DFT(*FIRST)                      +
-                          SPCVAL((*FIRST 0))               +
-                          PROMPT('Start sequence number')
-
-             PARM       KWD(ENDSEQ    ) TYPE(*DEC )        +
-                          LEN(6 2)                         +
-                          MIN(0)                           +
-                          DFT(*LAST)                       +
-                          SPCVAL((*LAST  9999,99))         +
-                          PROMPT('End sequence number')
-
-             PARM       KWD(LIB       ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for library        (&LI)')
-
-             PARM       KWD(OBJ       ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for object         (&OB)')
-
-             PARM       KWD(TYPECODE  ) TYPE(*CHAR)        +
-                          LEN(6)                           +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for type cde       (&TY)')
-
-             PARM       KWD(SRCLIB    ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for source library (&SL)')
-
-             PARM       KWD(SRCFILE   ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for source file    (&SF)')
-
-             PARM       KWD(SRCMBR    ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for source member  (&SM)')
-
-             PARM       KWD(TESTLIB   ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for test library   (&TL)')
-
-             PARM       KWD(TESTOBJ   ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for test object    (&TO)')
-
-             PARM       KWD(TGTRLS    ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for target release (&TR)')
-
-             PARM       KWD(FRMSRCLIB ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for from src.lib.  (&FL)')
-
-             PARM       KWD(FRMSRCFILE) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for from src. file (&FF)')
-
-             PARM       KWD(FRMSRCMBR ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for from src. mbr. (&FM)')
-
-             PARM       KWD(USER0     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U0)')
-
-             PARM       KWD(USER1     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U1)')
-
-             PARM       KWD(USER2     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U2)')
-
-             PARM       KWD(USER3     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U3)')
-
-             PARM       KWD(USER4     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U4)')
-
-             PARM       KWD(USER5     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U5)')
-
-             PARM       KWD(USER6     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U6)')
-
-             PARM       KWD(USER7     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U7)')
-
-             PARM       KWD(USER8     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U8)')
-
-             PARM       KWD(USER9     ) TYPE(*CHAR)        +
-                          LEN(30)                          +
-                          MIN(0)                           +
-                          DFT(*NONE)                       +
-                          SPCVAL((*NONE))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('Value for user-def. par. (&U9)')
-
-             PARM       KWD(MSGF      ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          CONSTANT(RUNCLSTME)
-
-             PARM       KWD(NAMING    ) TYPE(*CHAR)        +
-                          LEN(10)                          +
-                          MIN(0)                           +
-                          DFT(*SYS)                        +
-                          RSTD(*YES)                       +
-                          SPCVAL((*SYS )                   +
-                                 (*SQL ))                  +
-                          PMTCTL(*PMTRQS)                  +
-                          PROMPT('SQL Naming convention')
-
- QUAL1:      QUAL       TYPE(*NAME) LEN(10) MIN(1)
-             QUAL       TYPE(*NAME) LEN(10) DFT(*LIBL)     +
-                          SPCVAL((*LIBL) (*CURLIB))        +
-                          PROMPT('Library')
-
+      * ============================================================= *
+      *   Message structure                                           *
+      * ============================================================= *
+      *   >>PRE-COMPILER<<                                            *
+      *                                                               *
+      *     >>CRTCMD<<  CRTPF         FILE(&LI/&OB) +                 *
+      *                               SRCFILE(&SL/&SF)  +             *
+      *                               SRCMBR(&SM);                    *
+      *                                                               *
+      *     >>COMPILE<<                                               *
+      *       >>PARM<<                MAXMBRS(1);                     *
+      *       >>PARM<<                MBR(*FILE);                     *
+      *       >>PARM<<                FILETYPE(*DATA);                *
+      *                                                               *
+      *     >>END-COMPILE<<                                           *
+      *                                                               *
+      *     >>EXECUTE<<                                               *
+      *                                                               *
+      *   >>END-PRE-COMPILER<<                                        *
+      * ============================================================= *
+      **
+     A          R MSG                       TEXT('Message structure')
+      **
+     A            ID             7A         TEXT('Message ID     ')
+     A            DATA         512A         TEXT('Message Data   ')
+     A            TYPE          10A         TEXT('Message Type   ')
+     A            FILE          10A         TEXT('Message File   ')
+     A            LIB           10A         TEXT('Message Library')
+      **
 ]]>  </copysrc>
 </mbr>
-<qcmdexc condition="GER" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTCMD CMD(&tolib/RUNCLSTM) PGM(*LIBL/RUNCLSTM) SRCFILE(&tolib/QRUNCLSTM) SRCMBR(*CMD) HLPPNLGRP(*LI
-BL/RUNCLSTMP) HLPID(RUNCLSTM) PRDLIB(&tolib)
-]]>  </qcmdexc>
-<qcmdexc condition="ENG" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-CRTCMD CMD(&tolib/RUNCLSTME) PGM(*LIBL/RUNCLSTM) SRCFILE(&tolib/QRUNCLSTM) SRCMBR(*CMD) HLPPNLGRP(*L
-IBL/RUNCLSTMPE) HLPID(RUNCLSTM) PRDLIB(&tolib)
-]]>  </qcmdexc>
-<qcmdexc condition="ENG" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-RNMOBJ OBJ(&tolib/RUNCLSTME) OBJTYPE(*CMD) NEWOBJ(RUNCLSTM)
+<sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
+Installing XDQOBJ  type PF - in progress.
+]]>  </sendmsg>
+<!-- START OF MEMBER  -->
+<mbr
+mbrname =  "XDQOBJ    "
+mbrtype =  "PF        "
+mbrtext =  "Ext.DS  : Qualified object name                   "
+srcfile =  "QRUNCLSTM "
+srclib  =  "selected  "
+srclen  =  "00112"
+srccssid=  "00273">
+<copysrc><![CDATA[
+      * ============================================================= *
+      *   Qualified object name                                       *
+      * ============================================================= *
+      *   >>PRE-COMPILER<<                                            *
+      *                                                               *
+      *     >>CRTCMD<<  CRTPF         FILE(&LI/&OB) +                 *
+      *                               SRCFILE(&SL/&SF)  +             *
+      *                               SRCMBR(&SM);                    *
+      *                                                               *
+      *     >>COMPILE<<                                               *
+      *       >>PARM<<                MAXMBRS(1);                     *
+      *       >>PARM<<                MBR(*FILE);                     *
+      *       >>PARM<<                FILETYPE(*DATA);                *
+      *                                                               *
+      *     >>END-COMPILE<<                                           *
+      *                                                               *
+      *     >>EXECUTE<<                                               *
+      *                                                               *
+      *   >>END-PRE-COMPILER<<                                        *
+      *===============================================================*
+      *
+     A          R QOBJ                      TEXT('Qualified object name')
+      *
+     A            NAME          10A         TEXT('Object name      ')
+     A            LIB           10A         TEXT('Library          ')
+      *
+]]>  </copysrc>
+</mbr>
+<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="A_INSTALL"><![CDATA[
+CRTBNDCL PGM(&tolib/A_INSTALL) SRCFILE(&tolib/QRUNCLSTM) SRCMBR(*PGM) DFTACTGRP(*NO) ACTGRP(*NEW) DB
+GVIEW(*LIST)
 ]]>  </qcmdexc>
 <qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTF FILE(&tolib/XDERRCODE)
+CALL PGM(&tolib/A_INSTALL) PARM('&TGTRLS' '&SRCFILE' '&tolib' '&LANG')
 ]]>  </qcmdexc>
 <qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTF FILE(&tolib/XDMSG)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTF FILE(&tolib/XDQOBJ)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTMOD MODULE(&tolib/RUNCLSTMR1)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTMOD MODULE(&tolib/RUNCLSTMS1)
-]]>  </qcmdexc>
-<qcmdexc condition="*NONE" release="*CURRENT" dltsplf="*NONE"><![CDATA[
-DLTMOD MODULE(&tolib/RUNCLSTMS2)
+DLTPGM PGM(&tolib/A_INSTALL)
 ]]>  </qcmdexc>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*COMP     "><![CDATA[
 Application RUNCLSTM successfully installed.

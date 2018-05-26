@@ -1,0 +1,229 @@
+     /* =================================================================== */
+     /*                                                                     */
+     /*  Documentation:                                                     */
+     /*                                                                     */
+     /*  Utility . . . : RUNCLSTM                                           */
+     /*  Object  . . . : A_INSTALL  (PGM)                                   */
+     /*  Source member : A_INSTALL                                          */
+     /*  Source type . : CLLE                                               */
+     /*  Description   : RUNCLSTM - Installer                               */
+     /*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
+     /*  Created . . . :                                                    */
+     /*                                                                     */
+     /* =================================================================== */
+     /*                                                                     */
+     /*  This software is free software, you can redistribute it and/or     */
+     /*  modify it under the terms of the GNU General Public License (GPL)  */
+     /*  as published by the Free Software Foundation.                      */
+     /*                                                                     */
+     /*  See GNU General Public License for details.                        */
+     /*          http://www.opensource.org                                  */
+     /*          http://www.opensource.org/licenses/gpl-license.html        */
+     /*                                                                     */
+     /* =================================================================== */
+     /*  History:                                                           */
+     /*                                                                     */
+     /*  Datum       Name          Änderung                                 */
+     /*  ----------  ------------  ---------------------------------------  */
+     /*                                                                     */
+     /* =================================================================== */
+     /*   >>PRE-COMPILER<<                                                  */
+     /*     >>CRTCMD<<    CRTBNDCL  PGM(QTEMP/&OB) +                        */
+     /*                             SRCFILE(&SL/&SF) SRCMBR(&SM);           */
+     /*     >>IMPORTANT<<                                                   */
+     /*       >>PARM<<    OPTION(*EVENTF);                                  */
+     /*     >>END-IMPORTANT<<                                               */
+     /*     >>EXECUTE<<                                                     */
+     /*     >>CMD<<       CALL   PGM(QTEMP/A_INSTALL) +                     */
+     /*                          PARM('*CURRENT' '&SF' '&LI' 'GER');        */
+     /*     >>CMD<<       DLTPGM PGM(QTEMP/A_INSTALL);                      */
+     /*   >>END-PRE-COMPILER<<                                              */
+     /* =================================================================== */
+             PGM        PARM(&TGTRLS &SRCFILE &TOLIB &LNG)
+
+             DCL        VAR(&TGTRLS   ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCFILE  ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TOLIB    ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LNG      ) TYPE(*CHAR) LEN( 3)
+
+             DCL        VAR(&SRCLIB   ) TYPE(*CHAR) LEN(10)
+
+             DCL        VAR(&CRTMSGF  ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSGF     ) TYPE(*CHAR) LEN(10) VALUE('RUNCLSTM')
+             DCL        VAR(&PNLGRP   ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&CMD      ) TYPE(*CHAR) LEN(10)
+
+             CHGVAR     VAR(&SRCLIB) VALUE(&TOLIB   )
+
+     /* -------------------------------- */
+     /*  Set language values             */
+     /* -------------------------------- */
+             IF         COND(&LNG *EQ 'ENG') THEN(DO)
+                CHGVAR     VAR(&CRTMSGF) VALUE('A_MSG_ENG')
+                CHGVAR     VAR(&PNLGRP ) VALUE('RUNCLSTMPE')
+                CHGVAR     VAR(&CMD    ) VALUE('RUNCLSTME')
+             ENDDO
+             ELSE       CMD(DO)
+                CHGVAR     VAR(&CRTMSGF) VALUE('A_MSG_GER')
+                CHGVAR     VAR(&PNLGRP ) VALUE('RUNCLSTMP')
+                CHGVAR     VAR(&CMD    ) VALUE('RUNCLSTM')
+             ENDDO
+
+     /* -------------------------------- */
+     /*  Delete old objects              */
+     /* -------------------------------- */
+             DLTCMD    CMD(&TOLIB/&CMD)
+             MONMSG     MSGID(CPF2105)
+
+             DLTCMD    CMD(&TOLIB/RUNCLSTME)
+             MONMSG     MSGID(CPF2105)
+
+             DLTPGM    PGM(&TOLIB/RUNCLSTM)
+             MONMSG     MSGID(CPF2105)
+
+             DLTSRVPGM  SRVPGM(&TOLIB/RUNCLSTMS1)
+             MONMSG     MSGID(CPF2105)
+
+             DLTMSGF    MSGF(&TOLIB/&MSGF)
+             MONMSG     MSGID(CPF2105)
+
+             DLTMSGF    MSGF(&TOLIB/RUNCLSTME)
+             MONMSG     MSGID(CPF2105)
+
+             DLTPNLGRP  PNLGRP(&TOLIB/&PNLGRP)
+             MONMSG     MSGID(CPF2105)
+
+             DLTPNLGRP  PNLGRP(&TOLIB/RUNCLSTMPE)
+             MONMSG     MSGID(CPF2105)
+
+             DLTF       FILE(&TOLIB/XDERRCODE)
+             MONMSG     MSGID(CPF2105)
+
+             DLTF       FILE(&TOLIB/XDMSG)
+             MONMSG     MSGID(CPF2105)
+
+             DLTF       FILE(&TOLIB/XDQOBJ)
+             MONMSG     MSGID(CPF2105)
+
+     /* -------------------------------- */
+     /*  Create message file             */
+     /* -------------------------------- */
+             CRTMSGF    MSGF(&TOLIB/&MSGF) +
+                          TEXT('Tool: RUNCLSTM   (Run CL Statement)')
+
+             CRTCLPGM   PGM(QTEMP/&CRTMSGF) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*PGM) +
+                          OPTION(*LSTDBG) +
+                          TGTRLS(&TGTRLS)
+             DLTSPLF    FILE(&CRTMSGF  ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CALL       PGM(QTEMP/&CRTMSGF) PARM(&TOLIB)
+             DLTPGM     PGM(QTEMP/&CRTMSGF)
+
+     /* -------------------------------- */
+     /*  Create files                    */
+     /* -------------------------------- */
+             CRTPF      FILE(&TOLIB/XDERRCODE) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
+             DLTSPLF    FILE(XDERRCODE ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CRTPF      FILE(&TOLIB/XDMSG    ) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
+             DLTSPLF    FILE(XDMSG     ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CRTPF      FILE(&TOLIB/XDQOBJ   ) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
+             DLTSPLF    FILE(XDQOBJ    ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Create modules                  */
+     /* -------------------------------- */
+             CRTRPGMOD  MODULE(&TOLIB/RUNCLSTMS1) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*MODULE) +
+                          TEXT(*SRCMBRTXT) DBGVIEW(*LIST) +
+                          TGTRLS(&TGTRLS) +
+                          TRUNCNBR(*NO)
+             DLTSPLF    FILE(RUNCLSTMS1) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CRTRPGMOD MODULE(&TOLIB/RUNCLSTMS2) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*MODULE) +
+                          TEXT(*SRCMBRTXT) DBGVIEW(*LIST) +
+                          TGTRLS(&TGTRLS) +
+                          TRUNCNBR(*NO)
+             DLTSPLF    FILE(RUNCLSTMS2) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+             CRTRPGMOD MODULE(&TOLIB/RUNCLSTMR1) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*MODULE) +
+                          TEXT(*SRCMBRTXT) DBGVIEW(*LIST) +
+                          TGTRLS(&TGTRLS) +
+                          TRUNCNBR(*NO)
+             DLTSPLF    FILE(RUNCLSTMR1) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Create service programs         */
+     /* -------------------------------- */
+             CRTSRVPGM  SRVPGM(&TOLIB/RUNCLSTMS1) +
+                          MODULE(&TOLIB/RUNCLSTMS1 +
+                                 &TOLIB/RUNCLSTMS2 ) +
+                          SRCFILE(&TOLIB/QRUNCLSTM) +
+                          SRCMBR(RUNCLSTMF ) +
+                          ACTGRP(*CALLER) +
+                          DETAIL(*BASIC) +
+                          TEXT('Tool: RUNCLSCT   (Run CL Statement   )')
+             DLTSPLF    FILE(RUNCLSTMS1) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Create programs                 */
+     /* -------------------------------- */
+             CRTPGM     PGM(&TOLIB/RUNCLSTM) +
+                          MODULE(&TOLIB/RUNCLSTMR1) +
+                          BNDSRVPGM(&TOLIB/RUNCLSTMS1) +
+                          BNDDIR(QC2LE) +
+                          ACTGRP(*NEW) +
+                          TGTRLS(&TGTRLS) +
+                          DETAIL(*BASIC)
+             DLTSPLF    FILE(RUNCLSTM  ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Panel groups                    */
+     /* -------------------------------- */
+             CRTPNLGRP PNLGRP(&TOLIB/RUNCLSTMP) +
+                          SRCFILE(&SRCLIB/&SRCFILE) +
+                          SRCMBR(&PNLGRP)
+             DLTSPLF    FILE(RUNCLSTMP ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Create commands                 */
+     /* -------------------------------- */
+             CRTCMD     CMD(&TOLIB/RUNCLSTM) +
+                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(&CMD) +
+                          PGM(&TOLIB/RUNCLSTM)                   +
+                          HLPSCHIDX(*NONE)                       +
+                          HLPPNLGRP(*LIBL/RUNCLSTMP)             +
+                          HLPID(RUNCLSTM  )                      +
+                          PRDLIB(&TOLIB)
+             DLTSPLF    FILE(&CMD      ) JOB(*) SPLNBR(*LAST)
+             MONMSG     MSGID(CPF0000)
+
+     /* -------------------------------- */
+     /*  Delete obsolete objects         */
+     /* -------------------------------- */
+             DLTF       FILE(&TOLIB/XDERRCODE)
+             DLTF       FILE(&TOLIB/XDMSG)
+             DLTF       FILE(&TOLIB/XDQOBJ)
+
+             DLTMOD    MODULE(&TOLIB/RUNCLSTMS1)
+             DLTMOD    MODULE(&TOLIB/RUNCLSTMS2)
+             DLTMOD    MODULE(&TOLIB/RUNCLSTMR1)
+
+             ENDPGM
