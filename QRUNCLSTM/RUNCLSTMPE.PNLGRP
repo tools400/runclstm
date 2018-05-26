@@ -1,0 +1,565 @@
+.*=====================================================================*
+.*                                                                     *
+.*  Kurzdokumentation :                                                *
+.*                                                                     *
+.*  Bereich . . . : RUNCLSTM                                           *
+.*  Objekt  . . . : RUNCLSTMPE                                         *
+.*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         ) Eng  *
+.*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      *
+.*  Datum . . . . : 03.08.2000                                         *
+.*                                                                     *
+.*=====================================================================*
+.*                                                                     *
+.*  This software is free software, you can redistribute it and/or     *
+.*  modify it under the terms of the GNU General Public License (GPL)  *
+.*  as published by the Free Software Foundation.                      *
+.*                                                                     *
+.*  See GNU General Public License for details.                        *
+.*          http://www.opensource.org                                  *
+.*          http://www.opensource.org/licenses/gpl-license.html        *
+.*                                                                     *
+.*=====================================================================*
+.*  History:                                                           *
+.*                                                                     *
+.*  Datum       Name          Änderung                                 *
+.*  ----------  ------------  ---------------------------------------  *
+.*                                                                     *
+.*=====================================================================*
+.* >>PRE-COMPILER<<                                                    *
+.*                                                                     *
+.*   >>CRTCMD<< CRTPNLGRP    PNLGRP(&LI/&OB) +                         *
+.*                           SRCFILE(&SL/&SF) +                        *
+.*                           SRCMBR(&SM);                              *
+.*                                                                     *
+.*   >>COMPILE<<                                                       *
+.*   >>END-COMPILE<<                                                   *
+.*                                                                     *
+.*   >>EXECUTE<<                                                       *
+.*                                                                     *
+.* >>END-PRE-COMPILER<<                                                *
+.*=====================================================================*
+:PNLGRP.
+
+.*****************************************************************
+.*  Provide all the help for the command together in one help ID
+.*  so that it can be used by a search index.
+.*****************************************************************
+:HELP name='RUNCLSTM/ALL'.
+:IMHELP name=RUNCLSTM.
+:IMHELP name='RUNCLSTM/USESRCFILE'.
+:IMHELP name='RUNCLSTM/USESRCMBR'.
+:IMHELP name='RUNCLSTM/STRSEQ'.
+:IMHELP name='RUNCLSTM/ENDSEQ'.
+:IMHELP name='RUNCLSTM/LIB'.
+:IMHELP name='RUNCLSTM/OBJ'.
+:IMHELP name='RUNCLSTM/TYPECODE'.
+:IMHELP name='RUNCLSTM/SRCLIB'.
+:IMHELP name='RUNCLSTM/SRCFILE'.
+:IMHELP name='RUNCLSTM/SRCMBR'.
+:IMHELP name='RUNCLSTM/TESTLIB'.
+:IMHELP name='RUNCLSTM/TESTOBJ'.
+:IMHELP name='RUNCLSTM/TGTRLS'.
+:IMHELP name='RUNCLSTM/FRMSRCLIB'.
+:IMHELP name='RUNCLSTM/FRMSRCFILE'.
+:IMHELP name='RUNCLSTM/FRMSRCMBR'.
+:IMHELP name='RUNCLSTM/USER0'.
+:IMHELP name='RUNCLSTM/USER1'.
+:IMHELP name='RUNCLSTM/USER2'.
+:IMHELP name='RUNCLSTM/USER3'.
+:IMHELP name='RUNCLSTM/USER4'.
+:IMHELP name='RUNCLSTM/USER5'.
+:IMHELP name='RUNCLSTM/USER6'.
+:IMHELP name='RUNCLSTM/USER7'.
+:IMHELP name='RUNCLSTM/USER8'.
+:IMHELP name='RUNCLSTM/USER9'.
+:IMHELP name='RUNCLSTM/NAMING'.
+:EHELP.
+
+.*****************************************************************
+.*  Primary help text for the command.
+.*****************************************************************
+:HELP NAME='RUNCLSTM'.
+Run CL Statements - Help
+:P.
+RUNCLSTM can be used to excute CL statements from a CL Script
+member. Just put the CL statements that are to be executed
+into a source member and run RUNCLSTM against the member.
+:P.
+Beside CL statements RUNCLSTM can also execute embedded SQL
+statements.
+:P.
+Although the command originally was designed to help us to
+customize a change management product RUNCLSTM can also be used
+stand alone.
+:P.
+The following tags are supported by RUNCLSTM:
+:P.
+:PARML.
+:PT./EXEC SQL
+:PD.This tag marks the beginning of an embedded SQL section. Actually
+this tag switches RUNCLSTM into SQL mode. In contrast to the SQL syntax
+RUNCLSTM needs the typical CL continuation character '+' or '-' to
+identify a continuation line. Also the ';' character as an End-Of-Line
+marker must not be specified.
+
+:PT./END-EXEC
+:PD.This Tag marks the end of a SQL section.
+:EPARML.
+:P.
+:HP3.Attention::EHP3.
+:P.
+The CL statement :HP2.MONMSG:EHP2. is not fully supported. The keywords
+CMPDTA and EXEC are not supported.
+:P.
+MONMSG *can* be used to monitor SQL errors!
+:P.
+MONMSG can also be used to monitor generic messages like CPF9800 or
+CPF0000.
+:P.
+Global error monitoring is not supported.
+
+:P.
+Example:
+:P.
+:LINES.
+0001.00
+0002.00  /EXEC SQL
+0003.00         DROP   TABLE &LI/MYFILE
+0004.00         MONMSG     MSGID(SQL0204)
+0005.00
+0006.00         CREATE TABLE &LI/MYFILE +
+0007.00                (FLD1    CHAR (30) NOT NULL WITH DEFAULT, +
+0008.00                 FLD2    CHAR (30) NOT NULL WITH DEFAULT)
+0009.00  /END-EXEC
+0010.00
+0011.00  DLTCMD     CMD(&LI/MYCMD)
+0012.00  MONMSG     MSGID(CPF2105)
+0013.00
+:ELINES.
+:EHELP.
+
+.*****************************************************************
+.*  Help text for the command parameters.
+.*****************************************************************
+
+.********************************************
+.*  Keyword:  FILE
+.********************************************
+:HELP NAME='RUNCLSTM/USESRCFILE'.
+Source file (USESRCFILE) - Help
+:XH3.Use source file (USESRCFILE)
+:P.
+Specifies the qualified name of the source file that contains the SQL
+statements to be run.
+
+:IMHELP name='COM/REQPARM'.
+:P.
+The name of the source file can be qualified by one of the following
+library values:
+
+:PARML.
+:PT.:PK DEF.*LIBL:EPK.
+:PD.All libraries in the job's library list are searched
+until the first match is found.
+
+:PT.:PV.*CURLIB:EPV.
+:PD.The current library for the job is searched.  If no
+library is specified as the current library for the
+job, the QGPL library is used.
+
+:PT.:PV.library-name:EPV.
+:PD.Specify the name of the library to be searched.
+:EPARML.
+
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PV.source-file-name:EPV.
+:PD.Specify the name of the source file that contains the
+SQL statements to be run.  The source file can be a
+database file or an inline data file.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  MBR
+.********************************************
+:HELP NAME='RUNCLSTM/USESRCMBR'.
+Source member (USESRCMBR) - Help
+:XH3.Source member (USESRCMBR)
+:P.
+Specifies the name of the source file member that contains
+the SQL statements to be run.
+
+:IMHELP name='COM/REQPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  STRSEQ
+.********************************************
+:HELP NAME='RUNCLSTM/STRSEQ'.
+Start sequence number (STRSEQ) - Help
+:XH3.Start sequence number (STRSEQ)
+:P.
+The first sequence number to be executed.
+
+:IMHELP name='COM/REQPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  ENDSEQ
+.********************************************
+:HELP NAME='RUNCLSTM/ENDSEQ'.
+End sequence number (ENDSEQ) - Help
+:XH3.End sequence number (ENDSEQ)
+:P.
+The last sequence number to be executed.
+
+:IMHELP name='COM/REQPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  LIB (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/LIB'.
+Value for library (&LI) (LIB) - Help
+:XH3.Value for library (&LI) (LIB)
+:P.
+Value for the replacement variable 'Library' (&LI).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  OBJ (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/OBJ'.
+Value for object (&OB) (OBJ) - Help
+:XH3.Value for object (&OB) (OBJ)
+:P.
+Value for the replacement variable 'Object' (&OB).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  TYPECODE (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/TYPECODE'.
+Value for type code (&TY) (TYPECODE) - Help
+:XH3.Value for type code (&TY) (TYPECODE)
+:P.
+Value for the replacement variable 'Type Code' (&TY).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  SRCLIB (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/SRCLIB'.
+Value for source library (&SL) (SRCLIB) - Help
+:XH3.Value for source library (&SL) (SRCLIB)
+:P.
+Value for the replacement variable 'Source Library' (&SL).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  SRCFILE (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/SRCFILE'.
+Value for source file (&SF) (SRCFILE) - Help
+:XH3.Value for source file (&SF) (SRCFILE)
+:P.
+Value for the replacement variable 'Source File' (&SF).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  SRCMBR (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/SRCMBR'.
+Value for source member (&SM) (SRCMBR) - Help
+:XH3.Value for source member (&SM) (SRCMBR)
+:P.
+Value for the replacement variable 'Source Member' (&SM).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  TESTLIB (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/TESTLIB'.
+Value for test library (&TL) (TESTLIB) - Help
+:XH3.Value for test library (&TL) (TESTLIB)
+:P.
+Value for the replacement variable 'Test Library' (&TL).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  TESTOBJ (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/TESTOBJ'.
+Value for test object (&TO) (TESTOBJ) - Help
+:XH3.Value for test object (&TO) (TESTOBJ)
+:P.
+Value for the replacement variable 'Test Object' (&TO).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  TGTRLS (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/TGTRLS'.
+Value for target release (&TR) (TGTRLS) - Help
+:XH3.Value for target release (&TR) (TGTRLS)
+:P.
+Value for the replacement variable 'Target Release' (&TR).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  FRMSRCLIB (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/FRMSRCLIB'.
+Value for from source library (&FL) (FRMSRCLIB) - Help
+:XH3.Value for from source library (&FL) (FRMSRCLIB)
+:P.
+Value for the replacement variable 'From Source Library' (&FL).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  FRMSRCFILE (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/FRMSRCFILE'.
+Value for from source file (&FF) (FRMSRCFILE) - Help
+:XH3.Value for from source file (&FF) (FRMSRCFILE)
+:P.
+Value for the replacement variable 'From Source File' (&FF).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  FRMSRCMBR (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/FRMSRCMBR'.
+Value for from source member (&FM) (FRMSRCMBR) - Help
+:XH3.Value for from source member (&FM) (FRMSRCMBR)
+:P.
+Value for the replacement variable 'From Source Member' (&FM).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER0 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER0'.
+Value for user-defined parameter (&U0) (USER0) - Help
+:XH3.Value for user-defined parameter (&U0) (USER0)
+:P.
+Value for the replacement variable 'User-Defined Parameter 0' (&U0).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER1 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER1'.
+Value for user-defined parameter (&U1) (USER1) - Help
+:XH3.Value for user-defined parameter (&U1) (USER1)
+:P.
+Value for the replacement variable 'User-Defined Parameter 1' (&U1).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER2 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER2'.
+Value for user-defined parameter (&U2) (USER2) - Help
+:XH3.Value for user-defined parameter (&U2) (USER2)
+:P.
+Value for the replacement variable 'User-Defined Parameter 2' (&U2).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER3 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER3'.
+Value for user-defined parameter (&U3) (USER3) - Help
+:XH3.Value for user-defined parameter (&U3) (USER3)
+:P.
+Value for the replacement variable 'User-Defined Parameter 3' (&U3).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER4 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER4'.
+Value for user-defined parameter (&U4) (USER4) - Help
+:XH3.Value for user-defined parameter (&U4) (USER4)
+:P.
+Value for the replacement variable 'User-Defined Parameter 4' (&U4).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER5 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER5'.
+Value for user-defined parameter (&U5) (USER5) - Help
+:XH3.Value for user-defined parameter (&U5) (USER5)
+:P.
+Value for the replacement variable 'User-Defined Parameter 5' (&U5).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER6 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER6'.
+Value for user-defined parameter (&U6) (USER6) - Help
+:XH3.Value for user-defined parameter (&U6) (USER6)
+:P.
+Value for the replacement variable 'User-Defined Parameter 6' (&U6).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER7 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER7'.
+Value for user-defined parameter (&U7) (USER7) - Help
+:XH3.Value for user-defined parameter (&U7) (USER7)
+:P.
+Value for the replacement variable 'User-Defined Parameter 7' (&U7).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER8 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER8'.
+Value for user-defined parameter (&U8) (USER8) - Help
+:XH3.Value for user-defined parameter (&U8) (USER8)
+:P.
+Value for the replacement variable 'User-Defined Parameter 8' (&U8).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER9 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER9'.
+Value for user-defined parameter (&U9) (USER9) - Help
+:XH3.Value for user-defined parameter (&U9) (USER9)
+:P.
+Value for the replacement variable 'User-Defined Parameter 9' (&U9).
+
+:IMHELP name='COM/OPTPARM'.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  NAMING (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/NAMING'.
+Naming convention (NAMING) - Help
+:XH3.Naming convention (NAMING)
+:P.
+Select whether the SQL naming convention or the system
+naming convention is to be used.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*SYS:EPK.
+:PD.The system naming convention will be used.
+:PT.:PV.*SQL:EPV.
+:PD.The SQL naming convention will be used.
+:EPARML.
+
+:EHELP.
+
+.*****************************************************************
+.*  Common help text that is imbedded into one or more places.
+.*****************************************************************
+
+.********************************************
+.*  Required Parameter
+.********************************************
+:HELP NAME='COM/REQPARM'.
+:P.
+This parameter is required.
+:EHELP.
+
+.********************************************
+.*  Optional Parameter
+.********************************************
+:HELP NAME='COM/OPTPARM'.
+:P.
+This parameter is optional.
+:EHELP.
+
+.********************************************
+.*  List of values
+.********************************************
+:HELP NAME='COM/VALUES'.
+:P.
+The possible values are:
+:EHELP.
+
+.*****************************************************************
+.*  End of Panel Group
+.*****************************************************************
+:EPNLGRP.
+

@@ -1,0 +1,26 @@
+      * ============================================================= *
+      *   Qualified object name                                       *
+      * ============================================================= *
+      *   >>PRE-COMPILER<<                                            *
+      *                                                               *
+      *     >>CRTCMD<<  CRTPF         FILE(&LI/&OB) +                 *
+      *                               SRCFILE(&SL/&SF)  +             *
+      *                               SRCMBR(&SM);                    *
+      *                                                               *
+      *     >>COMPILE<<                                               *
+      *       >>PARM<<                MAXMBRS(1);                     *
+      *       >>PARM<<                MBR(*FILE);                     *
+      *       >>PARM<<                FILETYPE(*DATA);                *
+      *                                                               *
+      *     >>END-COMPILE<<                                           *
+      *                                                               *
+      *     >>EXECUTE<<                                               *
+      *                                                               *
+      *   >>END-PRE-COMPILER<<                                        *
+      *===============================================================*
+      *
+     A          R QOBJ                      TEXT('Qualified object name')
+      *
+     A            NAME          10A         TEXT('Object name      ')
+     A            LIB           10A         TEXT('Library          ')
+      *

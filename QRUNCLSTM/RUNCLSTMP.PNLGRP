@@ -1,0 +1,772 @@
+.*=====================================================================*
+.*                                                                     *
+.*  Kurzdokumentation :                                                *
+.*                                                                     *
+.*  Bereich . . . : RUNCLSTM                                           *
+.*  Objekt  . . . : RUNCLSTMP                                          *
+.*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         ) Ger  *
+.*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      *
+.*  Datum . . . . : 03.08.2000                                         *
+.*                                                                     *
+.*=====================================================================*
+.*                                                                     *
+.*  This software is free software, you can redistribute it and/or     *
+.*  modify it under the terms of the GNU General Public License (GPL)  *
+.*  as published by the Free Software Foundation.                      *
+.*                                                                     *
+.*  See GNU General Public License for details.                        *
+.*          http://www.opensource.org                                  *
+.*          http://www.opensource.org/licenses/gpl-license.html        *
+.*                                                                     *
+.*=====================================================================*
+.*  History:                                                           *
+.*                                                                     *
+.*  Datum       Name          Änderung                                 *
+.*  ----------  ------------  ---------------------------------------  *
+.*                                                                     *
+.*=====================================================================*
+.* >>PRE-COMPILER<<                                                    *
+.*                                                                     *
+.*   >>CRTCMD<< CRTPNLGRP    PNLGRP(&LI/&OB) +                         *
+.*                           SRCFILE(&SL/&SF) +                        *
+.*                           SRCMBR(&SM);                              *
+.*                                                                     *
+.*   >>COMPILE<<                                                       *
+.*   >>END-COMPILE<<                                                   *
+.*                                                                     *
+.*   >>EXECUTE<<                                                       *
+.*                                                                     *
+.* >>END-PRE-COMPILER<<                                                *
+.*=====================================================================*
+:PNLGRP.
+
+.*****************************************************************
+.*  Provide all the help for the command together in one help ID
+.*  so that it can be used by a search index.
+.*****************************************************************
+:HELP name='RUNCLSTM/ALL'.
+:IMHELP name=RUNCLSTM.
+:IMHELP name='RUNCLSTM/USESRCFILE'.
+:IMHELP name='RUNCLSTM/USESRCMBR'.
+:IMHELP name='RUNCLSTM/STRSEQ'.
+:IMHELP name='RUNCLSTM/ENDSEQ'.
+:IMHELP name='RUNCLSTM/LIB'.
+:IMHELP name='RUNCLSTM/OBJ'.
+:IMHELP name='RUNCLSTM/TYPECODE'.
+:IMHELP name='RUNCLSTM/SRCLIB'.
+:IMHELP name='RUNCLSTM/SRCFILE'.
+:IMHELP name='RUNCLSTM/SRCMBR'.
+:IMHELP name='RUNCLSTM/TESTLIB'.
+:IMHELP name='RUNCLSTM/TESTOBJ'.
+:IMHELP name='RUNCLSTM/TGTRLS'.
+:IMHELP name='RUNCLSTM/FRMSRCLIB'.
+:IMHELP name='RUNCLSTM/FRMSRCFILE'.
+:IMHELP name='RUNCLSTM/FRMSRCMBR'.
+:IMHELP name='RUNCLSTM/USER0'.
+:IMHELP name='RUNCLSTM/USER1'.
+:IMHELP name='RUNCLSTM/USER2'.
+:IMHELP name='RUNCLSTM/USER3'.
+:IMHELP name='RUNCLSTM/USER4'.
+:IMHELP name='RUNCLSTM/USER5'.
+:IMHELP name='RUNCLSTM/USER6'.
+:IMHELP name='RUNCLSTM/USER7'.
+:IMHELP name='RUNCLSTM/USER8'.
+:IMHELP name='RUNCLSTM/USER9'.
+:IMHELP name='RUNCLSTM/NAMING'.
+:EHELP.
+
+.*****************************************************************
+.*  Primary help text for the command.
+.*****************************************************************
+:HELP NAME='RUNCLSTM'.
+CL-Anweisungen ausführen - Hilfe
+:P.
+Der Befehl RUNCLSTM dient zur Ausführung von OS/400 CL-Befehlen, die
+in einer Quellenteildatei hinterlegt sind.
+:P.
+Neben der Ausführung von CL-Befehlen können auch SQL-Anweisungen
+ausgeführt werden (embedded-SQL).
+:P.
+Obwohl der Befehl RUNCLSTM ursprünglich entwickelt worden ist, um
+die eingesetzte Change Management Software an eigene Bedürfnisse
+anzupassen, kann er auch ausserhalb der Change Management Software
+verwendet werden und gute Dienste leisten.
+:P.
+Folgende Direktiven werden unterstützt:
+:P.
+:PARML.
+:PT./EXEC SQL
+:PD.Diese Directive kennzeichnet den Anfang eines SQL-Blocks.
+Hiermit wird quasi in den SQL-Modus umgeschaltet. Fortsetzungszeilen
+werden, wie in CL üblich mit '+' oder '-' gekennzeichnet. Das sonst
+übliche Semikolon als Endekennzeichen einer SQL-Anweisung entfällt.
+
+:PT./END-EXEC
+:PD.Diese Direktive kennzeichnet das Ende eines SQL-Blocks. Hiermit
+wird der CL-Modus re-aktiviert.
+:EPARML.
+:P.
+:HP3.Achtung::EHP3.
+:P.
+Der CL-Befehl :HP2.MONMSG:EHP2. wird nur eingeschränkt unterstützt. Zur
+Zeit wird nur das Schlüsselwort :HP2.MSGID:EHP2. erkannt und
+verarbeitet. Die Schlüsselworte CMPDTA und EXEC werden nicht
+erkannt und verarbeitet.
+:P.
+Der MONMSG Befehl kann auch für die Überwachung von SQL-Anweisungen
+benutzt werden.
+:P.
+Der MONMSG Befehl kann auch generische Nachrichten wie CPF9800 oder
+CPF000 überwachen.
+:P.
+Eine globale Nachrichtenüberwachung ist nicht möglich.
+:P.
+Beispiel:
+:P.
+:LINES.
+0001.00
+0002.00  /EXEC SQL
+0003.00         DROP   TABLE &LI/MYFILE
+0004.00         MONMSG     MSGID(SQL0204)
+0005.00
+0006.00         CREATE TABLE &LI/MYFILE +
+0007.00                (FLD1    CHAR (30) NOT NULL WITH DEFAULT, +
+0008.00                 FLD2    CHAR (30) NOT NULL WITH DEFAULT)
+0009.00  /END-EXEC
+0010.00
+0011.00  DLTCMD     CMD(&LI/MYCMD)
+0012.00  MONMSG     MSGID(CPF2105)
+0013.00
+:ELINES.
+:EHELP.
+
+.*****************************************************************
+.*  Help text for the command parameters.
+.*****************************************************************
+
+.********************************************
+.*  Keyword:  FILE
+.********************************************
+:HELP NAME='RUNCLSTM/USESRCFILE'.
+Quellendatei (USESRCFILE) - Hilfe
+:XH3.Quellendatei (USESRCFILE)
+:P.
+Name der Datei, welche die Teildatei mit den auszuführenden
+CL-Befehle und SQL-Anweisungen enthält.
+:IMHELP name='COM/REQPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PV.Datei:EPV.
+:PD.Name der Datei.
+
+:PT.:PK DEF.*LIBL:EPK.
+:PD.Datei wird über die Bibliotheksliste gesucht.
+:PT.:PV.Bibliothek:EPV.
+:PD.Name der Bibliothek, welche die Datei enthält.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  MBR
+.********************************************
+:HELP NAME='RUNCLSTM/USESRCMBR'.
+Teildatei (USESRCMBR) - Hilfe
+:XH3.Teildatei (USESRCMBR)
+:P.
+Name der Teildatei, welche die auszuführenden CL-Befehle
+und SQL-Anweisungen enthält.
+:IMHELP name='COM/REQPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+:PARML.
+:PT.:PV.Teildatei:EPV.
+:PD.
+Name der Teildatei.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  STRSEQ
+.********************************************
+:HELP NAME='RUNCLSTM/STRSEQ'.
+Startzeilennummer (STRSEQ) - Hilfe
+:XH3.Startzeilennummer (STRSEQ)
+:P.
+Erste auszuführende Zeilennummer in der Teildatei.
+:IMHELP name='COM/REQPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*FIRST:EPK.
+:PD.Die Ausführung startet mit der ersten Zeile der Teildatei.
+:PT.:PV.Startzeilennummer:EPV.
+:PD.Zeilennummer der ersten auszuführenden Anweisung.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  ENDSEQ
+.********************************************
+:HELP NAME='RUNCLSTM/ENDSEQ'.
+Endezeilennummer (ENDSEQ) - Hilfe
+:XH3.Endezeilennummer (ENDSEQ)
+:P.
+Letzte auszuführende Zeilennummer in der Teildatei.
+:IMHELP name='COM/REQPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*LAST:EPK.
+:PD.Die Ausführung endet mit der letzten Zeile der Teildatei.
+:PT.:PV.Startzeilennummer:EPV.
+:PD.Zeilennummer der letzen auszuführenden Anweisung.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  LIB (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/LIB'.
+Wert für Bibliothek      (&LI) (LIB) - Hilfe
+:XH3.Wert für Bibliothek      (&LI) (LIB)
+:P.
+Wert, der für die Ersatzvariable 'Bibliothek' (&LI) eingetragen
+werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Bibliothek:EPV.
+:PD.Name der Objektbibliothek.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  OBJ (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/OBJ'.
+Wert für Objekt          (&OB) (OBJ) - Hilfe
+:XH3.Wert für Objekt          (&OB) (OBJ)
+:P.
+Wert, der für die Ersatzvariable 'Objekt' (&OBJ) eingetragen
+werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Bibliothek:EPV.
+:PD.Name des Objekts.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  TYPECODE (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/TYPECODE'.
+Wert für Type Code       (&TY) (TYPECODE) - Hilfe
+:XH3.Wert für Type Code       (&TY) (TYPECODE)
+:P.
+Wert, der für die Ersatzvariable 'Type Code' (&TY) eingetragen
+werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Type Code:EPV.
+:PD.Type Code oder auch Benutzerdefiniertes Attribut.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  SRCLIB (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/SRCLIB'.
+Wert für Quellenbibl.    (&SL) (SRCLIB) - Hilfe
+:XH3.Wert für Quellenbibl.    (&SL) (SRCLIB)
+:P.
+Wert, der für die Ersatzvariable 'Quellenbibliothek' (&SL) eingetragen
+werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Quellenbibliothek:EPV.
+:PD.Name der Quellenbibliothek.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  SRCFILE (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/SRCFILE'.
+Wert für Quellendatei    (&SF) (SRCFILE) - Hilfe
+:XH3.Wert für Quellendatei    (&SF) (SRCFILE)
+:P.
+Wert, der für die Ersatzvariable 'Quellendatei' (&SF) eingetragen
+werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Quellendatei:EPV.
+:PD.Name der Quellendatei.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  SRCMBR (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/SRCMBR'.
+Wert für Quell.Teildatei (&SM) (SRCMBR) - Hilfe
+:XH3.Wert für Quell.Teildatei (&SM) (SRCMBR)
+:P.
+Wert, der für die Ersatzvariable 'Quellenteildatei' (&SM)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Quellenteildatei:EPV.
+:PD.Name der Quellenteildatei.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  TESTLIB (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/TESTLIB'.
+Wert für Testbibliothek  (&TL) (TESTLIB) - Hilfe
+:XH3.Wert für Testbibliothek  (&TL) (TESTLIB)
+:P.
+Wert, der für die Ersatzvariable 'Testbibliothek' (&TL)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Testbibliothek:EPV.
+:PD.Name der Testbibliothek.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  TESTOBJ (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/TESTOBJ'.
+Wert für Testobjekt      (&TO) (TESTOBJ) - Hilfe
+:XH3.Wert für Testobjekt      (&TO) (TESTOBJ)
+:P.
+Wert, der für die Ersatzvariable 'Testobjekt' (&TO)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Testobjekt:EPV.
+:PD.Name des Testobjekts.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  TGTRLS (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/TGTRLS'.
+Wert für Zielrelease     (&TR) (TGTRLS) - Hilfe
+:XH3.Wert für Zielrelease     (&TR) (TGTRLS)
+:P.
+Wert, der für die Ersatzvariable 'Zielrelease' (&TR)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.Zielrelease:EPV.
+:PD.OS/400 Zielrelease.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  FRMSRCLIB (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/FRMSRCLIB'.
+Wert für Von-Quellenbibl.(&FL) (FRMSRCLIB) - Hilfe
+:XH3.Wert für Von-Quellenbibl.(&FL) (FRMSRCLIB)
+:P.
+Wert, der für die Ersatzvariable 'von Quellenbibliothek' (&FL) eingetragen
+werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.von Quellenbibliothek:EPV.
+:PD.Name der 'von Quellenbibliothek'.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  FRMSRCFILE (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/FRMSRCFILE'.
+Wert für Von-Quellendatei(&FF) (FRMSRCFILE) - Hilfe
+:XH3.Wert für Von-Quellendatei(&FF) (FRMSRCFILE)
+:P.
+Wert, der für die Ersatzvariable 'von Quellendatei' (&FF) eingetragen
+werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.von Quellendatei:EPV.
+:PD.Name der 'von Quellendatei'.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  FRMSRCMBR (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/FRMSRCMBR'.
+Wert für Von-Quell.Teild.(&FM) (FRMSRCMBR) - Hilfe
+:XH3.Wert für Von-Quell.Teild.(&FM) (FRMSRCMBR)
+:P.
+Wert, der für die Ersatzvariable 'von Quellenteildatei' (&FM)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.von Quellenteildatei:EPV.
+:PD.Name der 'von Quellenteildatei'.
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER0 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER0'.
+Wert für Parameter       (&U0) (USER0) - Hilfe
+:XH3.Wert für Parameter       (&U0) (USER0)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 0 (&U0)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 0:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 0 (&U0).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER1 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER1'.
+Wert für Parameter       (&U1) (USER1) - Hilfe
+:XH3.Wert für Parameter       (&U1) (USER1)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 1 (&U1)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 1:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 1 (&U1).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER2 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER2'.
+Wert für Parameter       (&U2) (USER2) - Hilfe
+:XH3.Wert für Parameter       (&U2) (USER2)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 2 (&U2)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 2:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 2 (&U2).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER3 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER3'.
+Wert für Parameter       (&U3) (USER3) - Hilfe
+:XH3.Wert für Parameter       (&U3) (USER3)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 3 (&U3)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 3:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 3 (&U3).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER4 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER4'.
+Wert für Parameter       (&U4) (USER4) - Hilfe
+:XH3.Wert für Parameter       (&U4) (USER4)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 4 (&U4)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 4:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 4 (&U4).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER5 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER5'.
+Wert für Parameter       (&U5) (USER5) - Hilfe
+:XH3.Wert für Parameter       (&U5) (USER5)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 5 (&U5)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 5:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 5 (&U5).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER6 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER6'.
+Wert für Parameter       (&U6) (USER6) - Hilfe
+:XH3.Wert für Parameter       (&U6) (USER6)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 6 (&U6)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 6:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 6 (&U6).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER7 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER7'.
+Wert für Parameter       (&U7) (USER7) - Hilfe
+:XH3.Wert für Parameter       (&U7) (USER7)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 7 (&U7)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 7:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 7 (&U7).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER8 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER8'.
+Wert für Parameter       (&U8) (USER8) - Hilfe
+:XH3.Wert für Parameter       (&U8) (USER8)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 8 (&U8)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 8:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 8 (&U8).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  USER1 (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/USER9'.
+Wert für Parameter       (&U9) (USER9) - Hilfe
+:XH3.Wert für Parameter       (&U9) (USER9)
+:P.
+Wert, der für die benutzerdefinierte Ersatzvariable 9 (&U9)
+eingetragen werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*NONE:EPK.
+:PD.Es ist kein Wert angegeben.
+:PT.:PV.benutzerdefinierte Variable 9:EPV.
+:PD.Wert für die benutzerdefinierte Ersatzvariable 9 (&U9).
+:EPARML.
+
+:EHELP.
+
+.********************************************
+.*  Keyword:  NAMING (optional)
+.********************************************
+:HELP NAME='RUNCLSTM/NAMING'.
+Namenskonvention (NAMING) - Hilfe
+:XH3.Namenskonvention (NAMING)
+:P.
+Angeben, ob die SQL-Namenskonvention oder die
+Namenskonvention des Systems verwendet werden soll.
+:IMHELP name='COM/OPTPARM'.
+:P.
+:IMHELP name='COM/VALUES'.
+
+:PARML.
+:PT.:PK DEF.*SYS:EPK.
+:PD.Die Namenskonvention des Systems wird verwendet.
+:PT.:PV.*SQL:EPV.
+:PD.Die SQL-Namenskonvention wird verwendet.
+:EPARML.
+
+:EHELP.
+
+.*****************************************************************
+.*  Common help text that is imbedded into one or more places.
+.*****************************************************************
+
+.********************************************
+.*  Required Parameter
+.********************************************
+:HELP NAME='COM/REQPARM'.
+:P.
+Dieser Parameter ist erforderlich.
+:EHELP.
+
+.********************************************
+.*  Optional Parameter
+.********************************************
+:HELP NAME='COM/OPTPARM'.
+:P.
+Dieser Parameter ist optional.
+:EHELP.
+
+.********************************************
+.*  List of values
+.********************************************
+:HELP NAME='COM/VALUES'.
+:P.
+Mögliche Werte sind:
+:EHELP.
+
+.*****************************************************************
+.*  End of Panel Group
+.*****************************************************************
+:EPNLGRP.
+

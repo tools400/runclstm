@@ -1,0 +1,36 @@
+     /* =================================================================== */
+     /*                                                                     */
+     /*  Kurzdokumentation :                                                */
+     /*                                                                     */
+     /*  Bereich . . . : RUNCLSTM                                           */
+     /*  Objekt  . . . : RUNCLSTMF                                          */
+     /*  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      */
+     /*  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      */
+     /*  Datum . . . . : 03.08.2000                                         */
+     /*                                                                     */
+     /* =================================================================== */
+
+             STRPGMEXP  PGMLVL(*CURRENT) LVLCHK(*YES) SIGNATURE(*GEN)
+
+                EXPORT SYMBOL(f_cmpMonMsgId  )
+                EXPORT SYMBOL(f_execute      )
+                EXPORT SYMBOL(f_opnSql       )
+                EXPORT SYMBOL(f_executeSQL   )
+                EXPORT SYMBOL(p_cloSql       )
+                EXPORT SYMBOL(f_exist        )
+                EXPORT SYMBOL(f_fmtCmd       )
+                EXPORT SYMBOL(f_getApiErrMsg )
+                EXPORT SYMBOL(f_isApiErr     )
+                EXPORT SYMBOL(f_newErrCode   )
+                EXPORT SYMBOL(f_newMsg       )
+                EXPORT SYMBOL(f_right        )
+                EXPORT SYMBOL(f_rmvRemCl     )
+
+                EXPORT SYMBOL(p_endPgmAbn    )
+                EXPORT SYMBOL(p_sndPgmMsg    )
+
+                EXPORT SYMBOL(p_setMsgFile   )
+                EXPORT SYMBOL(f_getMsgFile   )
+                EXPORT SYMBOL(f_getMsgFileLib)
+
+             ENDPGMEXP
