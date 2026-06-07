@@ -21,7 +21,7 @@
 /* =================================================================== */
 /*  History:                                                           */
 /*                                                                     */
-/*  Datum       Name          Änderung                                 */
+/*  Datum       Name          Ã„nderung                                 */
 /*  ----------  ------------  ---------------------------------------  */
 /*                                                                     */
 /* =================================================================== */
@@ -43,7 +43,7 @@
 /* >>END-PRE-COMPILER<<                                                */
 /* =================================================================== */
 
-             CMD        PROMPT('CL-Anweisungen ausführen')
+             CMD        PROMPT('CL-Anweisungen ausfÃ¼hren')
 
              PARM       KWD(USESRCFILE) TYPE(QUAL1)        +
                         MIN(1)                             +
@@ -73,7 +73,7 @@
                           MIN(0)                           +
                           DFT(*NONE)                       +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Bibliothek      (&LI)')
+                          PROMPT('Wert fÃ¼r Bibliothek      (&LI)')
 
              PARM       KWD(OBJ       ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -81,7 +81,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Objekt          (&OB)')
+                          PROMPT('Wert fÃ¼r Objekt          (&OB)')
 
              PARM       KWD(TYPECODE  ) TYPE(*CHAR)        +
                           LEN(6)                           +
@@ -89,7 +89,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Type Code       (&TY)')
+                          PROMPT('Wert fÃ¼r Type Code       (&TY)')
 
              PARM       KWD(SRCLIB    ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -97,7 +97,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Quellenbibl.    (&SL)')
+                          PROMPT('Wert fÃ¼r Quellenbibl.    (&SL)')
 
              PARM       KWD(SRCFILE   ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -105,7 +105,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Quellendatei    (&SF)')
+                          PROMPT('Wert fÃ¼r Quellendatei    (&SF)')
 
              PARM       KWD(SRCMBR    ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -113,7 +113,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Quell.Teildatei (&SM)')
+                          PROMPT('Wert fÃ¼r Quell.Teildatei (&SM)')
 
              PARM       KWD(TESTLIB   ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -121,7 +121,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Testbibliothek  (&TL)')
+                          PROMPT('Wert fÃ¼r Testbibliothek  (&TL)')
 
              PARM       KWD(TESTOBJ   ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -129,7 +129,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Testobjekt      (&TO)')
+                          PROMPT('Wert fÃ¼r Testobjekt      (&TO)')
 
              PARM       KWD(TGTRLS    ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -137,7 +137,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Zielrelease     (&TR)')
+                          PROMPT('Wert fÃ¼r Zielrelease     (&TR)')
 
              PARM       KWD(FRMSRCLIB ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -145,7 +145,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Von-Quellenbibl.(&FL)')
+                          PROMPT('Wert fÃ¼r Von-Quellenbibl.(&FL)')
 
              PARM       KWD(FRMSRCFILE) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -153,7 +153,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Von-Quellendatei(&FF)')
+                          PROMPT('Wert fÃ¼r Von-Quellendatei(&FF)')
 
              PARM       KWD(FRMSRCMBR ) TYPE(*CHAR)        +
                           LEN(10)                          +
@@ -161,7 +161,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Von-Quell.Teild.(&FM)')
+                          PROMPT('Wert fÃ¼r Von-Quell.Teild.(&FM)')
 
              PARM       KWD(USER0     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -169,7 +169,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U0)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U0)')
 
              PARM       KWD(USER1     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -177,7 +177,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U1)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U1)')
 
              PARM       KWD(USER2     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -185,7 +185,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U2)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U2)')
 
              PARM       KWD(USER3     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -193,7 +193,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U3)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U3)')
 
              PARM       KWD(USER4     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -201,7 +201,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U4)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U4)')
 
              PARM       KWD(USER5     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -209,7 +209,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U5)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U5)')
 
              PARM       KWD(USER6     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -217,7 +217,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U6)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U6)')
 
              PARM       KWD(USER7     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -225,7 +225,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U7)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U7)')
 
              PARM       KWD(USER8     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -233,7 +233,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U8)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U8)')
 
              PARM       KWD(USER9     ) TYPE(*CHAR)        +
                           LEN(30)                          +
@@ -241,7 +241,7 @@
                           DFT(*NONE)                       +
                           SPCVAL((*NONE))                  +
                           PMTCTL(*PMTRQS)                  +
-                          PROMPT('Wert für Parameter       (&U9)')
+                          PROMPT('Wert fÃ¼r Parameter       (&U9)')
 
              PARM       KWD(MSGF      ) TYPE(*CHAR)        +
                           LEN(10)                          +

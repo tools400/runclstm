@@ -23,7 +23,7 @@
      /* =================================================================== */
      /*  History:                                                           */
      /*                                                                     */
-     /*  Datum       Name          Änderung                                 */
+     /*  Datum       Name          Ã„nderung                                 */
      /*  ----------  ------------  ---------------------------------------  */
      /*                                                                     */
      /* =================================================================== */
@@ -122,24 +122,6 @@
              DLTPGM     PGM(QTEMP/&CRTMSGF)
 
      /* -------------------------------- */
-     /*  Create files                    */
-     /* -------------------------------- */
-             CRTPF      FILE(&TOLIB/XDERRCODE) +
-                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
-             DLTSPLF    FILE(XDERRCODE ) JOB(*) SPLNBR(*LAST)
-             MONMSG     MSGID(CPF0000)
-
-             CRTPF      FILE(&TOLIB/XDMSG    ) +
-                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
-             DLTSPLF    FILE(XDMSG     ) JOB(*) SPLNBR(*LAST)
-             MONMSG     MSGID(CPF0000)
-
-             CRTPF      FILE(&TOLIB/XDQOBJ   ) +
-                          SRCFILE(&SRCLIB/&SRCFILE) SRCMBR(*FILE)
-             DLTSPLF    FILE(XDQOBJ    ) JOB(*) SPLNBR(*LAST)
-             MONMSG     MSGID(CPF0000)
-
-     /* -------------------------------- */
      /*  Create modules                  */
      /* -------------------------------- */
              CRTRPGMOD  MODULE(&TOLIB/RUNCLSTMS1) +
@@ -218,10 +200,6 @@
      /* -------------------------------- */
      /*  Delete obsolete objects         */
      /* -------------------------------- */
-             DLTF       FILE(&TOLIB/XDERRCODE)
-             DLTF       FILE(&TOLIB/XDMSG)
-             DLTF       FILE(&TOLIB/XDQOBJ)
-
              DLTMOD    MODULE(&TOLIB/RUNCLSTMS1)
              DLTMOD    MODULE(&TOLIB/RUNCLSTMS2)
              DLTMOD    MODULE(&TOLIB/RUNCLSTMR1)

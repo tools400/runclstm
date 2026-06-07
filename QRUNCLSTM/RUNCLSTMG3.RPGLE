@@ -1,78 +1,70 @@
-      * =================================================================== *
-      *                                                                     *
-      *  Kurzdokumentation :                                                *
-      *                                                                     *
-      *  Bereich . . . : RUNCLSTM                                           *
-      *  Objekt  . . . : RUNCLSTMG3                                         *
-      *  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      *
-      *  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      *
-      *  Datum . . . . : 03.08.2000                                         *
-      *                                                                     *
-      * =================================================================== *
-      *
-      *===============================================================*
-      *  Reference fields
-      *===============================================================*
-      *
-     D msg_t         E DS                  extname(xdmsg     ) based(pDummy)
-     D                                     prefix(msg_t_     )
-     D errCode_t     E DS                  extname(xderrcode ) based(pDummy)
-     D                                     prefix(errcode_t  )
-     D qObj_t        E DS                  extname(xdqobj    ) based(pDummy)
-     D                                     prefix(qObj_t     )
-     D capcmd_t        S          32702A   based(pDummy)
-     D cmdToken_t      S             10A   based(pDummy)
-     D bool_t          S               N   based(pDummy)
-     D int2_t          S              5I 0 based(pDummy)
-     D int4_t          S             10I 0 based(pDummy)
-     D string_t        S          32767A   based(pDummy)
-     D obj_t           S             10A   based(pDummy)
-     D fc_t            S             12A   based(pDummy)
-     D file_t          S                   like(obj_t     )
-     D                                     based(pDummy)
-     D lib_t           S                   like(obj_t     )
-     D                                     based(pDummy)
-     D mbr_t           S                   like(obj_t     )
-     D                                     based(pDummy)
-     D mod_t           S                   like(obj_t     )
-     D                                     based(pDummy)
-     D naming_t        S             10A   based(pDummy)
-     D objType_t       S             10A   based(pDummy)
-     D pgm_t           S                   like(obj_t     )
-     D                                     based(pDummy)
-     D proc_t          S            256A   based(pDummy)
-     D srcSeq_t        S              6P 2 based(pDummy)
-     D tgtRls_t        S             10A   based(pDummy)
-     D typeCode_t      S              6A   based(pDummy)
-     D userDef_t       S             30A   based(pDummy)
-      *
-      *===============================================================*
-      *  Cosntants
-      *===============================================================*
-     D cTrue           C                   const(*on )
-     D cFalse          C                   const(*off)
-      *
-     D cMsg_Same       C                   const(-3)
-     D cMsg_Prv        C                   const(-2)
-     D cMsg_Ext        C                   const(-1)
-     D cMsg_ToMyself   C                   const('*')
-     D cMsg_ToPgmBdy   C                   const('*PGMBDY')
-     D cMsg_ToCtlBdy   C                   const('*CTLBDY')
-     D cMsg_ToPgm      C                   const('*PGMNAME')
-      *
-     D cMsg_AppInfo    C                   const('*INFO')
-     D cMsg_AppWarning...
-     D                 C                   const('*WARNING')
-     D cMsg_AppError   C                   const('*ERROR')
-      *
-     D cMsg_TypInfo    C                   const('*INFO')
-     D cMsg_TypDiag    C                   const('*DIAG')
-     D cMsg_TypEscape  C                   const('*ESCAPE')
-      *
-     D cErr_MonErr     C                   const(*ON)
-     D cErr_NoMonErr   C                   const(*OFF)
-      *
-     D cCEE_IsPresent  C                   const(1)
-     D cCEE_IsNotPresent...
-     D                 C                   const(0)
-      *
+**free
+// =================================================================== *
+//                                                                     *
+//  Kurzdokumentation :                                                *
+//                                                                     *
+//  Bereich . . . : RUNCLSTM                                           *
+//  Objekt  . . . : RUNCLSTMG3                                         *
+//  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      *
+//  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      *
+//  Datum . . . . : 03.08.2000                                         *
+//                                                                     *
+// =================================================================== *
+
+//===============================================================*
+//  Reference fields
+//===============================================================*
+
+/include qrunclstm,fderrcode
+/include qrunclstm,fdmsg
+/include qrunclstm,fdqobj
+
+dcl-s capcmd_t char(32702) based(pDummy);
+dcl-s cmdToken_t char(10) based(pDummy);
+dcl-s bool_t ind based(pDummy);
+dcl-s int2_t int(5) based(pDummy);
+dcl-s int4_t int(10) based(pDummy);
+dcl-s string_t char(32767) based(pDummy);
+dcl-s obj_t char(10) based(pDummy);
+dcl-s fc_t char(12) based(pDummy);
+dcl-s file_t like(obj_t) based(pDummy);
+dcl-s lib_t like(obj_t) based(pDummy);
+dcl-s mbr_t like(obj_t) based(pDummy);
+dcl-s mod_t like(obj_t) based(pDummy);
+dcl-s naming_t char(10) based(pDummy);
+dcl-s objType_t char(10) based(pDummy);
+dcl-s pgm_t like(obj_t) based(pDummy);
+dcl-s proc_t char(256) based(pDummy);
+dcl-s srcSeq_t packed(6: 2) based(pDummy);
+dcl-s tgtRls_t char(10) based(pDummy);
+dcl-s typeCode_t char(6) based(pDummy);
+dcl-s userDef_t char(30) based(pDummy);
+
+//===============================================================*
+//  Cosntants
+//===============================================================*
+dcl-c cTrue *on;
+dcl-c cFalse *off;
+
+dcl-c cMsg_Same -3;
+dcl-c cMsg_Prv -2;
+dcl-c cMsg_Ext -1;
+dcl-c cMsg_ToMyself '*';
+dcl-c cMsg_ToPgmBdy '*PGMBDY';
+dcl-c cMsg_ToCtlBdy '*CTLBDY';
+dcl-c cMsg_ToPgm '*PGMNAME';
+
+dcl-c cMsg_AppInfo '*INFO';
+dcl-c cMsg_AppWarning '*WARNING';
+dcl-c cMsg_AppError '*ERROR';
+
+dcl-c cMsg_TypInfo '*INFO';
+dcl-c cMsg_TypDiag '*DIAG';
+dcl-c cMsg_TypEscape '*ESCAPE';
+
+dcl-c cErr_MonErr *on;
+dcl-c cErr_NoMonErr *off;
+
+dcl-c cCEE_IsPresent 1;
+dcl-c cCEE_IsNotPresent 0;
+

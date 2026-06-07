@@ -1,6 +1,6 @@
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD für Message-ID :   USR0001                    */
-     /* Länge ausserhalb des gültigen Bereichs.                     */
+     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0001                    */
+     /* LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.                     */
      /*-------------------------------------------------------------*/
 
              PGM        PARM(&LI)
@@ -14,7 +14,7 @@
                 MSGID(USR0001) +
                 MSGF(&LI/RUNCLSTM) +
                 MSG(+
-'Länge ausserhalb des gültigen Bereichs.'                             +
+'LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.'                             +
                 ) +
                 SEV(00) +
      /*   Keine Ersatzvariablen definiert!                          */ +
@@ -23,8 +23,8 @@
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD für Message-ID :   USR0002                    */
-     /* Fehler bei Befehlsausführung in Zeile &1.                   */
+     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0002                    */
+     /* Fehler bei BefehlsausfÃ¼hrung in Zeile &1.                   */
      /*-------------------------------------------------------------*/
 
              RMVMSGD MSGID(USR0002) MSGF(&LI/RUNCLSTM)
@@ -34,7 +34,7 @@
                 MSGID(USR0002) +
                 MSGF(&LI/RUNCLSTM) +
                 MSG(+
-'Fehler bei Befehlsausführung in Zeile &1.'                           +
+'Fehler bei BefehlsausfÃ¼hrung in Zeile &1.'                           +
                 ) +
                 SECLVL(+
 'Befehl  . . . . : &2'                                                +
@@ -49,7 +49,7 @@
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD für Message-ID :   USR0003                    */
+     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0003                    */
      /* Die Betriebsart &1 ist bereits eingestellt worden.          */
      /*-------------------------------------------------------------*/
 
@@ -63,7 +63,7 @@
 'Die Betriebsart &1 ist bereits eingestellt worden.'                  +
                 ) +
                 SECLVL(+
-'Maßnahmen . . . :   Stellen Sie sicher, dass die Anweisung &2 nicht z-
+'MaÃŸnahmen . . . :   Stellen Sie sicher, dass die Anweisung &2 nicht z-
 weimal hintereinander verwendet wird. Die Anweisung &2 muss immer mit -
 &3 beendet werden.'                                                   +
                 ) +
@@ -78,7 +78,7 @@ weimal hintereinander verwendet wird. Die Anweisung &2 muss immer mit -
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD für Message-ID :   USR0004                    */
+     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0004                    */
      /* Die Betriebsart &1 ist bereits eingestellt worden.          */
      /*-------------------------------------------------------------*/
 
@@ -92,7 +92,7 @@ weimal hintereinander verwendet wird. Die Anweisung &2 muss immer mit -
 'Die Betriebsart &1 ist bereits eingestellt worden.'                  +
                 ) +
                 SECLVL(+
-'Maßnahmen . . . :   Stellen Sie sicher, dass die Anweisung &2 nicht z-
+'MaÃŸnahmen . . . :   Stellen Sie sicher, dass die Anweisung &2 nicht z-
 weimal hintereinander verwendet wird. Die Anweisung &2 muss immer mit -
 &3 eingeleitet werden.'                                               +
                 ) +

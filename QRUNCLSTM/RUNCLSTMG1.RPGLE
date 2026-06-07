@@ -1,132 +1,117 @@
-      * =================================================================== *
-      *                                                                     *
-      *  Kurzdokumentation :                                                *
-      *                                                                     *
-      *  Bereich . . . : RUNCLSTM                                           *
-      *  Objekt  . . . : RUNCLSTMG1                                         *
-      *  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      *
-      *  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      *
-      *  Datum . . . . : 03.08.2000                                         *
-      *                                                                     *
-      * =================================================================== *
-      *
-      *===============================================================*
-      *  Exported Prototypes
-      *===============================================================*
-      *
-     D f_rmvRemCl...
-     D                 PR         32767A          varying
-     D  i_clString                32767A   value
-     D                                     varying
-      *
-      *  ÷ffnen SQL
-     D f_opnSQL        PR                         like(bool_t    )
-     D  i_naming                           const  like(naming_t  )
-     D  o_msg                                     like(msg_t     )
-      *
-     D f_executeSQL...
-     D                 PR                  opdesc like(bool_t    )
-     D  i_sqlStmt                          const  like(capcmd_t  )
-     D                                     options(*varsize)
-     D  o_msg                                     like(msg_t     )
-      *
-      *  Schlieﬂen SQL
-     D p_cloSQL        PR
-      *
-     D f_execute...
-     D                 PR                  opdesc like(bool_t    )
-     D  i_cmd                              const  like(capcmd_t  )
-     D                                     options(*varsize)
-     D  o_msg                                     like(msg_t     )
-     D                                     options(*nopass: *omit)
-     D  i_typCmdPrc                        const  like(int4_t    )
-     D                                     options(*nopass)
-      *
-     D f_fmtCmd...
-     D                 PR                         like(capcmd_t  )
-     D  i_cmd                              value  like(capcmd_t  )
-      *
-     D f_cmpMonMsgID...
-     D                 PR                         like(bool_t    )
-     D  i_msgId                            value  like(msg_t_ID  )
-     D  i_monMsgId                         value  like(msg_t_ID  )
-      *
-     D f_newErrCode...
-     D                 PR                         like(errCode_t )
-     D  i_monErr                           value  like(bool_t    )
-      *
-     D f_getAPIErrMsg...
-     D                 PR                         like(msg_t     )
-     D  i_errorCode                        value  like(errCode_t )
-      *
-     D f_isAPIErr...
-     D                 PR                         like(bool_t    )
-     D  i_errorCode                        value  like(errCode_t )
-      *
-     D f_newMsg...
-     D                 PR                         like(msg_t     )
-     D  i_msgID                            value  like(msg_t_ID  )
-      * optionale Parametergruppe 1
-     D  i_msgType                          value  like(msg_t_type)
-     D                                     options(*NOPASS)
-      * optionale Parametergruppe 2
-     D  i_msgDta                           const  like(msg_t_data)
-     D                                     options(*NOPASS: *OMIT)
-      * optionale Parametergruppe 3
-     D  i_msgF                             value  like(msg_t_file)
-     D                                     options(*NOPASS)
-      * optionale Parametergruppe 4
-     D  i_msgL                             value  like(msg_t_lib )
-     D                                     options(*NOPASS)
-      *
-     D f_right...
-     D                 PR         32767A   varying
-     D  i_string                  32767A   value
-     D                                     varying
-     D  i_rLen                             value  like(int4_t    )
-     D                                     options(*nopass )
-      *
-     D p_endPgmAbn...
-     D                 PR
-     D  i_msg                              value  like(msg_t     )
-      *
-     D p_sndPgmMsg...
-     D                 PR
-     D  i_msg                              value  like(msg_t     )
-      * optionale Parametergruppe 1
-     D  i_toStkC                           value  like(int4_t    )
-     D                                     options(*NOPASS)
-      * optionale Parametergruppe 2
-     D  i_toProc                           value  like(proc_t    )
-     D                                     options(*NOPASS)
-      * optionale Parametergruppe 3
-     D  i_toMod                            const  like(mod_t     )
-     D                                     options(*NOPASS: *OMIT)
-      * optionale Parametergruppe 4
-     D  i_toPgm                            value  like(pgm_t     )
-     D                                     options(*NOPASS)
-      *
-     D f_exist...
-     D                 PR                         like(bool_t    )
-     D  i_obj                              const  like(obj_t     )
-     D  i_lib                              const  like(lib_t     )
-     D                                     options(*omit)
-     D  i_objType                          const  like(objType_t )
-     D  i_mbr                              const  like(mbr_t     )
-     D                                     options(*omit)
-     D  o_msg                                     like(msg_t     )
-     D                                     options(*nopass)
-      *  Set Message file
-     D p_setMsgFile...
-     D                 PR
-     D  i_msgF                             value like(msg_t_file)
-     D  i_msgFLib                          value like(msg_t_lib )
-      *
-      *  Get Message file
-     D f_getMsgFile...
-     D                 PR                        like(msg_t_file)
-      *
-      *  Get Message file library
-     D f_getMsgFileLib...
-     D                 PR                        like(msg_t_lib )
-      *
+**free
+// =================================================================== *
+//                                                                     *
+//  Kurzdokumentation :                                                *
+//                                                                     *
+//  Bereich . . . : RUNCLSTM                                           *
+//  Objekt  . . . : RUNCLSTMG1                                         *
+//  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      *
+//  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      *
+//  Datum . . . . : 03.08.2000                                         *
+//                                                                     *
+// =================================================================== *
+
+//===============================================================*
+//  Exported Prototypes
+//===============================================================*
+
+dcl-pr f_rmvRemCl varchar(32767);
+  i_clString varchar(32767) value;
+end-pr;
+
+//  √ñffnen SQL
+dcl-pr f_opnSQL like(bool_t);
+  i_naming like(naming_t) const;
+  o_msg    likeds(msg_t);
+end-pr;
+
+dcl-pr f_executeSQL opdesc like(bool_t);
+  i_sqlStmt like(capcmd_t) options(*varsize) const;
+  o_msg     likeds(msg_t);
+end-pr;
+
+//  Schlie√üen SQL
+dcl-pr p_cloSQL;
+end-pr;
+
+dcl-pr f_execute opdesc like(bool_t);
+  i_cmd       like(capcmd_t) options(*varsize) const;
+  o_msg       likeds(msg_t) options(*nopass: *omit);
+  i_typCmdPrc like(int4_t) options(*nopass) const;
+end-pr;
+
+dcl-pr f_fmtCmd like(capcmd_t);
+  i_cmd like(capcmd_t) value;
+end-pr;
+
+dcl-pr f_cmpMonMsgID like(bool_t);
+  i_msgId    like(msg_t.ID) value;
+  i_monMsgId like(msg_t.ID) value;
+end-pr;
+
+dcl-pr f_newErrCode like(errCode_t);
+  i_monErr like(bool_t) value;
+end-pr;
+
+dcl-pr f_getAPIErrMsg likeds(msg_t);
+  i_errorCode like(errCode_t) value;
+end-pr;
+
+dcl-pr f_isAPIErr like(bool_t);
+  i_errorCode like(errCode_t) value;
+end-pr;
+
+dcl-pr f_newMsg likeds(msg_t);
+  i_msgID   like(msg_t.ID) value;
+  // optionale Parametergruppe 1
+  i_msgType like(msg_t.type) options(*nopass) value;
+  // optionale Parametergruppe 2
+  i_msgDta  like(msg_t.data) options(*nopass: *omit) const;
+  // optionale Parametergruppe 3
+  i_msgF    like(msg_t.file) options(*nopass) value;
+  // optionale Parametergruppe 4
+  i_msgL    like(msg_t.lib) options(*nopass) value;
+end-pr;
+
+dcl-pr f_right varchar(32767);
+  i_string varchar(32767) value;
+  i_rLen   like(int4_t) options(*nopass) value;
+end-pr;
+
+dcl-pr p_endPgmAbn;
+  i_msg likeds(msg_t) value;
+end-pr;
+
+dcl-pr p_sndPgmMsg;
+  i_msg    likeds(msg_t) value;
+  // optionale Parametergruppe 1
+  i_toStkC like(int4_t) options(*nopass) value;
+  // optionale Parametergruppe 2
+  i_toProc like(proc_t) options(*nopass) value;
+  // optionale Parametergruppe 3
+  i_toMod  like(mod_t) options(*nopass: *omit) const;
+  // optionale Parametergruppe 4
+  i_toPgm  like(pgm_t) options(*nopass) value;
+end-pr;
+
+dcl-pr f_exist like(bool_t);
+  i_obj     like(obj_t) const;
+  i_lib     like(lib_t) options(*omit) const;
+  i_objType like(objType_t) const;
+  i_mbr     like(mbr_t) options(*omit) const;
+  o_msg     likeds(msg_t) options(*nopass);
+end-pr;
+//  Set Message file
+dcl-pr p_setMsgFile;
+  i_msgF    like(msg_t.file) value;
+  i_msgFLib like(msg_t.lib) value;
+end-pr;
+
+//  Get Message file
+dcl-pr f_getMsgFile like(msg_t.file);
+end-pr;
+
+//  Get Message file library
+dcl-pr f_getMsgFileLib like(msg_t.lib);
+end-pr;
+

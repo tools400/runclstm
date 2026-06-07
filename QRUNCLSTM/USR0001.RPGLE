@@ -1,9 +1,11 @@
-      *---------------------------------------------------------------
-      * Datenstruktur für Message-ID : USR0001
-      *
-      * Länge ausserhalb des gültigen Bereichs.
-      *
-     D USR0001         DS
-      *   Keine Ersatzvariablen definiert!
-     D USR0001#        S              8B 0 INZ(0000)
-      *
+**free
+//---------------------------------------------------------------
+// Datenstruktur fÃ¼r Message-ID : USR0001
+
+// LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.
+
+dcl-ds USR0001;
+end-ds;
+//   Keine Ersatzvariablen definiert!
+dcl-s USR0001# bindec(8) inz(0000);
+

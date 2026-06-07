@@ -1,6 +1,6 @@
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD für Message-ID :   USR0001                    */
-     /* Länge ausserhalb des gültigen Bereichs.                     */
+     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0001                    */
+     /* LÃ¤nge ausserhalb des gÃ¼ltigen Bereichs.                     */
      /*-------------------------------------------------------------*/
 
              PGM        PARM(&LI)
@@ -23,8 +23,8 @@
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD für Message-ID :   USR0002                    */
-     /* Fehler bei Befehlsausführung in Zeile &1.                   */
+     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0002                    */
+     /* Fehler bei BefehlsausfÃ¼hrung in Zeile &1.                   */
      /*-------------------------------------------------------------*/
 
              RMVMSGD MSGID(USR0002) MSGF(&LI/RUNCLSTM)
@@ -49,7 +49,7 @@
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD für Message-ID :   USR0003                    */
+     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0003                    */
      /* Die Betriebsart &1 ist bereits eingestellt worden.          */
      /*-------------------------------------------------------------*/
 
@@ -78,7 +78,7 @@ ately after each other. The tag &2 always must be followed by the tag -
                 /*  -EOF-  */
 
      /*-------------------------------------------------------------*/
-     /*   Cmd-ADDMSGD für Message-ID :   USR0004                    */
+     /*   Cmd-ADDMSGD fÃ¼r Message-ID :   USR0004                    */
      /* Die Betriebsart &1 ist bereits eingestellt worden.          */
      /*-------------------------------------------------------------*/
 

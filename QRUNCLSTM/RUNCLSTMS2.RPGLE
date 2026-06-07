@@ -1,358 +1,325 @@
-      * =================================================================== *
-      *                                                                     *
-      *  Kurzdokumentation :                                                *
-      *                                                                     *
-      *  Bereich . . . : RUNCLSTM                                           *
-      *  Objekt  . . . : RUNCLSTMS2                                         *
-      *  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      *
-      *  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      *
-      *  Datum . . . . : 03.08.2000                                         *
-      *                                                                     *
-      * =================================================================== *
-      *                                                                     *
-      *  This software is free software, you can redistribute it and/or     *
-      *  modify it under the terms of the GNU General Public License (GPL)  *
-      *  as published by the Free Software Foundation.                      *
-      *                                                                     *
-      *  See GNU General Public License for details.                        *
-      *          http://www.opensource.org                                  *
-      *          http://www.opensource.org/licenses/gpl-license.html        *
-      *                                                                     *
-      *=====================================================================*
-      *  History:                                                           *
-      *                                                                     *
-      *  Datum       Name          Änderung                                 *
-      *  ----------  ------------  ---------------------------------------  *
-      *  03.05.2002  Th.Raddatz    Changed RUNCLSTM to use SQL-CLI.         *
-      *  19.06.2002  Th.Raddatz    Fixed error in f_sqlErrMsg() to          *
-      *                            get the correct SQL message ID.          *
-      *                                                                     *
-      * =================================================================== *
-      * >>PRE-COMPILER<<                                                    *
-      *                                                                     *
-      *   >>CRTCMD<< CRTRPGMOD    MODULE(&LI/&OB) +                         *
-      *                           SRCFILE(&SL/&SF) +                        *
-      *                           SRCMBR(&SM);                              *
-      *                                                                     *
-      *   >>COMPILE<<                                                       *
-      *     >>PARM<< TRUNCNBR(*NO);                                         *
-      *     >>PARM<< DBGVIEW(*LIST);                                        *
-      *   >>END-COMPILE<<                                                   *
-      *                                                                     *
-      *   >>EXECUTE<<                                                       *
-      *                                                                     *
-      * >>END-PRE-COMPILER<<                                                *
-      * =================================================================== *
-     H NOMAIN
-      /COPY QRUNCLSTM,COPYRIGHT
-      * =================================================================== *
-      *
-      /COPY QRUNCLSTM,RUNCLSTMG3
-      /COPY QRUNCLSTM,SQLCLI
-      *
-      *===============================================================*
-      *  Nachrichten
-      *===============================================================*
-      *
-      *===============================================================*
-      *  Public Prototypes
-      *===============================================================*
-      /COPY QRUNCLSTM,RUNCLSTMG1
-      /COPY QRUNCLSTM,RUNCLSTMG2
-      *
-      *===============================================================*
-      *  Globale Variablen
-      *===============================================================*
-     D g_henv          S                   like(SQLHENV_t  ) inz
-     D g_hdbc          S                   like(SQLHDBC_t )  inz
-     D g_hstmt         S                   like(SQLHSTMT_t)  inz
-      *
-      *===============================================================*
-      *  Public Prototypes
-      *===============================================================*
-      *
-      *===============================================================*
-      *  Private Prototypes
-      *===============================================================*
-      *
-      *  Is SQL Error
-     D f_isSqlErr      PR                        like(bool_t      )
-     D  i_rc                               value like(SQLRETCODE_t)
-     D  o_msg                                    like(msg_t       )
-      *
-      *  Get SQL MsgID
-     D f_sqlErrMsg     PR                        like(msg_t     )
-      *
-      *===================================================================*
-      *  Prozedur:  f_opnSQL                                   (Body)     *
-      *===================================================================*
-      *
-     P f_opnSQL        B                   export
-      *
-      *  definieren Procedure Interface ...
-     D f_opnSQL        PI                         like(bool_t    )
-     D  i_naming                           const  like(naming_t  )
-     D  o_msg                                     like(msg_t     )
-      *
-      *  definieren Funktionswert ...
-     D f_opnSQL        S                   like(bool_t    ) inz
-      *
-      *  lokale variablen ...
-     D rc              S                   like(SQLRETCODE_t) inz
-     D connectAttr     S                   like(SQLINTEGER_t) inz
-     D envAttr         S                   like(SQLINTEGER_t) inz
-      * ------------------------------------------------------------------------
-      *
-      * EXEC SQL CONNECT TO :server USER :uid USING :authentication_string;
-      * ... allocate an environment handle
-     C                   Eval      rc = SQLAllocEnv (%addr(g_henv))
-      *
-     C                   If        f_isSqlErr(rc: o_msg)
-     C                   Eval      f_opnSQL = cFalse
-     C                   Callp     p_cloSQL
-     C                   Goto      fkt_ende
-     C                   Endif
-      *
-      * ... change environment attribute to requested naming standard
-     C                   If        i_naming = '*SQL'
-     C                   Eval      envAttr = SQL_FALSE
-     C                   Else
-     C                   Eval      envAttr = SQL_TRUE
-     C                   Endif
-     C                   Eval      rc = SQLSetEnvAttr(g_henv              :
-     C                                                SQL_ATTR_SYS_NAMING :
-     C                                                %addr(envAttr)      :
-     C                                                %size(envAttr)      )
-      *
-     C                   If        f_isSqlErr(rc: o_msg)
-     C                   Eval      f_opnSQL = cFalse
-     C                   Callp     p_cloSQL
-     C                   Goto      fkt_ende
-     C                   Endif
-      *
-      * ... allocate a connection handle
-     C                   Eval      rc = SQLAllocConnect (g_henv: %addr(g_hdbc))
-      *
-     C                   If        f_isSqlErr(rc: o_msg)
-     C                   Eval      f_opnSQL = cFalse
-     C                   Callp     p_cloSQL
-     C                   Goto      fkt_ende
-     C                   Endif
-      *
-      * ... change connection attribute to not use committment control
-     C                   Eval      connectAttr = SQL_TXN_NO_COMMIT
-     C                   Eval      rc = SQLSetConnectAttr(g_hdbc            :
-     C                                                    SQL_ATTR_COMMIT   :
-     C                                                    %addr(connectAttr):
-     C                                                    %size(connectAttr))
-      *
-     C                   If        f_isSqlErr(rc: o_msg)
-     C                   Eval      f_opnSQL = cFalse
-     C                   Callp     p_cloSQL
-     C                   Goto      fkt_ende
-     C                   Endif
-      *
-      * ... connect to database indicated by "server" variable
-      *     and current user profile
-     C                   Eval      rc = SQLConnect (g_hdbc  :
-     C                                              '*LOCAL': SQL_NTS:
-     C                                              *null   : SQL_NTS:
-     C                                              *null   : SQL_NTS)
-      *
-     C                   If        f_isSqlErr(rc: o_msg)
-     C                   Eval      f_opnSQL = cFalse
-     C                   Callp     p_cloSQL
-     C                   Goto      fkt_ende
-     C                   Endif
-      *
-      * ... allocate a statement handle
-     C                   Eval      rc = SQLAllocStmt (g_hdbc: %addr(g_hstmt))
-      *
-     C                   If        f_isSqlErr(rc: o_msg)
-     C                   Eval      f_opnSQL = cFalse
-     C                   Callp     p_cloSQL
-     C                   Goto      fkt_ende
-     C                   Endif
-      *
-     C                   Eval      f_opnSQL = cTrue
-      *
-     C     fkt_ende      Tag
-      *
-     C                   Return    f_opnSQL
-      *
-     P f_opnSQL        E
-      *
-      *===============================================================*
-      *  Execute SQL statement
-      *===============================================================*
-     P f_executeSQL...
-     P                 B                   export
-      *
-     D f_executeSQL...
-     D                 PI                  opdesc like(bool_t    )
-     D  i_sqlStmt                          const  like(capCmd_t  )
-     D                                     options(*varsize)
-     D  o_msg                                     like(msg_t     )
-      *
-      *  Definieren Funktionswert
-     D isOK            S                   like(bool_t    )
-     D                                     inz
-      *
-      *  Definieren Parameter für p_getOpDesc
-     D posNr           S                   inz like(int4_t    )
-     D descType        S                   inz like(int4_t    )
-     D datatype        S                   inz like(int4_t    )
-     D descInf1        S                   inz like(int4_t    )
-     D descInf2        S                   inz like(int4_t    )
-     D dataLen         S                   inz like(int4_t    )
-     D feedBack        S                   inz like(fc_t      )
-      *
-      *  Hilfsfelder für Funktion: p_TestOmit
-     D isPresent       S                   like(int4_t      )
-     D                                     inz
-      *
-      *  Arbeitsfelder
-     D sqlStmt         S                   like(i_sqlStmt   ) inz
-     D rc              S                   like(SQLRETCODE_t) inz
-      *---------------------------------------------------------------
-      *
-     C                   Callp     p_getOpDesc(1: descType: dataType:
-     C                                            descInf1: descInf2:
-     C                                            dataLen:  feedBack)
-      *
-     C                   Eval      sqlStmt = %subst(i_sqlStmt: 1: dataLen)
-      *
-      *  ausführen SQL Anweisung
-     C                   Eval      rc = SQLExecDirect(g_hstmt        :
-     C                                                %trim(sqlStmt) :
-     C                                                SQL_NTS        )
-     C                   If        f_isSqlErr(rc: o_msg)
-     C                   Eval      isOK = cFalse
-     C                   Else
-     C                   Eval      isOK = cTrue
-     C                   Endif
-      *
-     C                   Return    isOK
-      *
-     P f_executeSQL...
-     P                 E
-      *
-      *===================================================================*
-      *  Prozedur:  p_cloSQL                                   (Body)     *
-      *===================================================================*
-      *
-     P p_cloSQL        B                   export
-      *
-      *  definieren Procedure Interface ...
-     D p_cloSQL        PI
-      *
-      *  lokale variablen ...
-     D rc              S                   like(SQLRETCODE_t) inz
-     D msg             S                   like(msg_t       ) inz
-      * ------------------------------------------------------------------------
-      *
-      * EXEC SQL CLOSE c1;
-      * ... free the statement handle
-     C                   If        g_hstmt <> 0
-     C                   Eval      rc = SQLFreeStmt(g_hstmt: SQL_DROP)
-     C                   Endif
-      *
-      * EXEC SQL DISCONNECT;
-      * disconnect from the database
-     C                   If        g_hdbc <> 0
-     C                   Eval      rc = SQLDisconnect(g_hdbc)
-     C                   Endif
-      *
-      * free the connection handle
-     C                   If        g_hdbc <> 0
-     C                   Eval      rc = SQLFreeConnect(g_hdbc)
-     C                   Endif
-      *
-      * free the environment handle
-     C                   If        g_henv <> 0
-     C                   Eval      rc = SQLFreeEnv(g_henv)
-     C                   Endif
-      *
-     C                   Reset                   g_hstmt
-     C                   Reset                   g_hdbc
-     C                   Reset                   g_henv
-      *
-     C                   Return
-      *
-     P p_cloSQL        E
-      *
-      *===================================================================*
-      *  Private:
-      *  Prozedur:  f_isSqlErr
-      *===================================================================*
-      *
-     P f_isSqlErr      B
-      *
-      *  definieren Procedure Interface ...
-     D f_isSqlErr      PI                        like(bool_t      )
-     D  i_rc                               value like(SQLRETCODE_t)
-     D  o_msg                                    like(msg_t       )
-      *
-      *  definieren Funktionswert ...
-     D f_isSqlErr      S                   like(bool_t    )
-      *
-      *  lokale Arbeitsfelder
-      * ------------------------------------------------------------------------
-      *
-     C                   If        (i_rc <> SQL_SUCCESS          )  and
-     C                             (i_rc <> SQL_SUCCESS_WITH_INFO)
-     C                   Eval      f_isSqlErr = cTrue
-     C                   Eval      o_msg      = f_sqlErrMsg
-     C                   Else
-     C                   Eval      f_isSqlErr = cFalse
-     C                   Eval      o_msg      = f_newMsg(' ')
-     C                   Endif
-      *
-     C                   Return    f_isSqlErr
-      *
-     P f_isSqlErr      E
-      *
-      *===================================================================*
-      *  Prozedur:  f_sqlErrMsg                                (Body)     *
-      *===================================================================*
-      *
-     P f_sqlErrMsg     B
-      *
-      *  definieren Procedure Interface ...
-     D f_sqlErrMsg     PI                        like(msg_t     )
-      *
-      *  definieren Funktionswert ...
-     D f_sqlErrMsg     S                   like(msg_t     ) inz
-      *
-      *  lokale variablen ...
-      *  ... buffer = SQL_MAX_MESSAGE_LENGTH + 1
-     D buffer          S            513A
-     D sqlState        S              5A
-     D sqlCode         S                   like(SQLINTEGER_t )
-     D length          S                   like(SQLSMALLINT_t)
-     D msgID           DS
-     D  msgID_prefix                  3A
-     D  msgID_num                     4S 0
-      * ------------------------------------------------------------------------
-      *
-     C                   If        SQLError(SQL_NULL_HENV: g_hdbc: g_hstmt:
-     C                                      %addr(sqlState) :
-     C                                      %addr(sqlCode)  :
-     C                                      %addr(buffer)   :
-     C                                      %size(buffer)   :
-     C                                      %addr(length)        ) = SQL_SUCCESS
-     C                   Eval      msgID_prefix = 'SQL'
-     C                   Eval      msgID_num    = %abs(sqlCode)
-     C                   Eval      f_sqlErrMsg = f_newMsg(msgID               :
-     C                                                    cMsg_TypEscape      :
-     C                                                    %str(%addr(buffer)) :
-     C                                                    'QSQLMSG'           :
-     C                                                    '*LIBL'             )
-     C                   Else
-     C                   Eval      f_sqlErrMsg = f_newMsg(' ')
-     C                   Endif
-      *
-     C                   Return    f_sqlErrMsg
-      *
-     P f_sqlErrMsg     E
-      *
+**free
+// =================================================================== *
+//                                                                     *
+//  Kurzdokumentation :                                                *
+//                                                                     *
+//  Bereich . . . : RUNCLSTM                                           *
+//  Objekt  . . . : RUNCLSTMS2                                         *
+//  Beschreibung  : Tool: RUNCLSTM   (Run CL Statements         )      *
+//  Author  . . . : Thomas Raddatz   <thomas.raddatz@tools400.de>      *
+//  Datum . . . . : 03.08.2000                                         *
+//                                                                     *
+// =================================================================== *
+//                                                                     *
+//  This software is free software, you can redistribute it and/or     *
+//  modify it under the terms of the GNU General Public License (GPL)  *
+//  as published by the Free Software Foundation.                      *
+//                                                                     *
+//  See GNU General Public License for details.                        *
+//          http://www.opensource.org                                  *
+//          http://www.opensource.org/licenses/gpl-license.html        *
+//                                                                     *
+//=====================================================================*
+//  History:                                                           *
+//                                                                     *
+//  Datum       Name          Ã„nderung                                 *
+//  ----------  ------------  ---------------------------------------  *
+//  03.05.2002  Th.Raddatz    Changed RUNCLSTM to use SQL-CLI.         *
+//  19.06.2002  Th.Raddatz    Fixed error in f_sqlErrMsg() to          *
+//                            get the correct SQL message ID.          *
+//                                                                     *
+// =================================================================== *
+// >>PRE-COMPILER<<                                                    *
+//                                                                     *
+//   >>CRTCMD<< CRTRPGMOD    MODULE(&LI/&OB) +                         *
+//                           SRCFILE(&SL/&SF) +                        *
+//                           SRCMBR(&SM);                              *
+//                                                                     *
+//   >>COMPILE<<                                                       *
+//     >>PARM<< TRUNCNBR(*NO);                                         *
+//     >>PARM<< DBGVIEW(*LIST);                                        *
+//     >>PARM<< OPTION(*EVENTF);                                       *
+//   >>END-COMPILE<<                                                   *
+//                                                                     *
+//   >>EXECUTE<<                                                       *
+//                                                                     *
+// >>END-PRE-COMPILER<<                                                *
+// =================================================================== *
+ctl-opt nomain;
+/copy QRUNCLSTM,COPYRIGHT
+// =================================================================== *
+
+/copy QRUNCLSTM,RUNCLSTMG3
+/copy QRUNCLSTM,SQLCLI
+
+//===============================================================*
+//  Nachrichten
+//===============================================================*
+
+//===============================================================*
+//  Public Prototypes
+//===============================================================*
+/copy QRUNCLSTM,RUNCLSTMG1
+/copy QRUNCLSTM,RUNCLSTMG2
+
+//===============================================================*
+//  Globale Variablen
+//===============================================================*
+dcl-s g_henv like(SQLHENV_t) inz;
+dcl-s g_hdbc like(SQLHDBC_t) inz;
+dcl-s g_hstmt like(SQLHSTMT_t) inz;
+
+//===============================================================*
+//  Public Prototypes
+//===============================================================*
+
+//===============================================================*
+//  Private Prototypes
+//===============================================================*
+
+//  Is SQL Error
+dcl-pr f_isSqlErr like(bool_t);
+  i_rc  like(SQLRETCODE_t) value;
+  o_msg like(msg_t);
+end-pr;
+
+//  Get SQL MsgID
+dcl-pr f_sqlErrMsg like(msg_t);
+end-pr;
+
+//===================================================================*
+//  Prozedur:  f_opnSQL                                   (Body)     *
+//===================================================================*
+
+dcl-proc f_opnSQL export;
+
+  //  definieren Procedure Interface ...
+  dcl-pi *n like(bool_t);
+    i_naming like(naming_t) const;
+    o_msg    likeds(msg_t);
+  end-pi;
+
+  //  lokale variablen ...
+  dcl-s rc like(SQLRETCODE_t) inz;
+  dcl-s connectAttr like(SQLINTEGER_t) inz;
+  dcl-s envAttr like(SQLINTEGER_t) inz;
+  // ------------------------------------------------------------------------
+
+  // EXEC SQL CONNECT TO :server USER :uid USING :authentication_string;
+  // ... allocate an environment handle
+  rc = SQLAllocEnv (%addr(g_henv));
+
+  If f_isSqlErr(rc: o_msg);
+    p_cloSQL();
+    return cFalse;
+  Endif;
+
+  // ... change environment attribute to requested naming standard
+  If i_naming = '*SQL';
+    envAttr = SQL_FALSE;
+  Else;
+    envAttr = SQL_TRUE;
+  Endif;
+  rc = SQLSetEnvAttr(g_henv: SQL_ATTR_SYS_NAMING: %addr(envAttr): %size(envAttr));
+
+  If f_isSqlErr(rc: o_msg);
+    p_cloSQL();
+    return cFalse;
+  Endif;
+
+  // ... allocate a connection handle
+  rc = SQLAllocConnect (g_henv: %addr(g_hdbc));
+
+  If f_isSqlErr(rc: o_msg);
+    p_cloSQL();
+    return cFalse;
+  Endif;
+
+  // ... change connection attribute to not use committment control
+  connectAttr = SQL_TXN_NO_COMMIT;
+  rc = SQLSetConnectAttr(g_hdbc: SQL_ATTR_COMMIT: %addr(connectAttr): %size(connectAttr));
+
+  If f_isSqlErr(rc: o_msg);
+    p_cloSQL();
+    return cFalse;
+  Endif;
+
+  // ... connect to database indicated by "server" variable
+  //     and current user profile
+  rc = SQLConnect (g_hdbc: '*LOCAL': SQL_NTS: *null: SQL_NTS: *null: SQL_NTS);
+
+  If f_isSqlErr(rc: o_msg);
+    p_cloSQL();
+    return cFalse;
+  Endif;
+
+  // ... allocate a statement handle
+  rc = SQLAllocStmt (g_hdbc: %addr(g_hstmt));
+
+  If f_isSqlErr(rc: o_msg);
+    p_cloSQL();
+    return cFalse;
+  Endif;
+
+
+  return cTrue;
+
+end-proc;
+
+//===============================================================*
+//  Execute SQL statement
+//===============================================================*
+dcl-proc f_executeSQL export;
+  dcl-pi *n opdesc like(bool_t);
+    i_sqlStmt like(capCmd_t) options(*varsize) const;
+    o_msg     likeds(msg_t);
+  end-pi;
+
+  //  Definieren Funktionswert
+  dcl-s isOK like(bool_t) inz;
+
+  //  Definieren Parameter fÃ¼r p_getOpDesc
+  dcl-s descType inz like(int4_t);
+  dcl-s datatype inz like(int4_t);
+  dcl-s descInf1 inz like(int4_t);
+  dcl-s descInf2 inz like(int4_t);
+  dcl-s dataLen inz like(int4_t);
+  dcl-s feedBack inz like(fc_t);
+
+  //  Arbeitsfelder
+  dcl-s sqlStmt like(i_sqlStmt) inz;
+  dcl-s rc like(SQLRETCODE_t) inz;
+  //---------------------------------------------------------------
+
+  p_getOpDesc(1: descType: dataType:
+                 descInf1: descInf2:
+                 dataLen:  feedBack);
+
+  sqlStmt = %subst(i_sqlStmt: 1: dataLen);
+
+  //  ausfÃ¼hren SQL Anweisung
+  rc = SQLExecDirect(g_hstmt: %trim(sqlStmt): SQL_NTS);
+  If f_isSqlErr(rc: o_msg);
+    isOK = cFalse;
+  Else;
+    isOK = cTrue;
+  Endif;
+
+  return isOK;
+
+end-proc;
+
+//===================================================================*
+//  Prozedur:  p_cloSQL                                   (Body)     *
+//===================================================================*
+
+dcl-proc p_cloSQL export;
+
+  //  definieren Procedure Interface ...
+  dcl-pi *n;
+  end-pi;
+
+  //  lokale variablen ...
+  dcl-s rc like(SQLRETCODE_t) inz;
+  dcl-s msg like(msg_t) inz;
+  // ------------------------------------------------------------------------
+
+  // EXEC SQL CLOSE c1;
+  // ... free the statement handle
+  If g_hstmt <> 0;
+    rc = SQLFreeStmt(g_hstmt: SQL_DROP);
+  Endif;
+
+  // EXEC SQL DISCONNECT;
+  // disconnect from the database
+  If g_hdbc <> 0;
+    rc = SQLDisconnect(g_hdbc);
+  Endif;
+
+  // free the connection handle
+  If g_hdbc <> 0;
+    rc = SQLFreeConnect(g_hdbc);
+  Endif;
+
+  // free the environment handle
+  If g_henv <> 0;
+    rc = SQLFreeEnv(g_henv);
+  Endif;
+
+  Reset g_hstmt;
+  Reset g_hdbc;
+  Reset g_henv;
+
+  return;
+
+end-proc;
+
+//===================================================================*
+//  Private:
+//  Prozedur:  f_isSqlErr
+//===================================================================*
+
+dcl-proc f_isSqlErr;
+
+  //  definieren Procedure Interface ...
+  dcl-pi *n like(bool_t);
+    i_rc  like(SQLRETCODE_t) value;
+    o_msg like(msg_t);
+  end-pi;
+
+  //  definieren Funktionswert ...
+  dcl-s f_isSqlErr like(bool_t);
+
+  //  lokale Arbeitsfelder
+  // ------------------------------------------------------------------------
+
+  If (i_rc <> SQL_SUCCESS) and (i_rc <> SQL_SUCCESS_WITH_INFO);
+    f_isSqlErr = cTrue;
+    o_msg = f_sqlErrMsg;
+  Else;
+    f_isSqlErr = cFalse;
+    o_msg = f_newMsg('');
+  Endif;
+
+  return f_isSqlErr;
+
+end-proc;
+
+//===================================================================*
+//  Prozedur:  f_sqlErrMsg                                (Body)     *
+//===================================================================*
+
+dcl-proc f_sqlErrMsg;
+
+  //  definieren Procedure Interface ...
+  dcl-pi *n like(msg_t);
+  end-pi;
+
+  //  definieren Funktionswert ...
+  dcl-s f_sqlErrMsg like(msg_t) inz;
+
+  //  lokale variablen ...
+  //  ... buffer = SQL_MAX_MESSAGE_LENGTH + 1
+  dcl-s buffer char(513);
+  dcl-s sqlState char(5);
+  dcl-s sqlCode like(SQLINTEGER_t);
+  dcl-s length like(SQLSMALLINT_t);
+  dcl-ds msgID;
+    msgID_prefix char(3);
+    msgID_num    zoned(4);
+  end-ds;
+  // ------------------------------------------------------------------------
+
+  If SQLError(SQL_NULL_HENV: g_hdbc: g_hstmt: %addr(sqlState): %addr(sqlCode)
+              : %addr(buffer): %size(buffer): %addr(length)) = SQL_SUCCESS;
+    msgID_prefix = 'SQL';
+    msgID_num = %abs(sqlCode);
+    f_sqlErrMsg = f_newMsg(msgID: cMsg_TypEscape: %str(%addr(buffer)): 'QSQLMSG': '*LIBL');
+  Else;
+    f_sqlErrMsg = f_newMsg('');
+  Endif;
+
+  return f_sqlErrMsg;
+
+end-proc;
+
