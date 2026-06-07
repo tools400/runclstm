@@ -4175,6 +4175,7 @@ srccssid=  "01141">
 //   >>COMPILE<<                                                       *
 //     >>PARM<< TRUNCNBR(*NO);                                         *
 //     >>PARM<< DBGVIEW(*LIST);                                        *
+//     >>PARM<< OPTION(*EVENTF);                                       *
 //   >>END-COMPILE<<                                                   *
 //                                                                     *
 //   >>EXECUTE<<                                                       *
@@ -5469,6 +5470,7 @@ srccssid=  "01141">
 //   >>COMPILE<<                                                       *
 //     >>PARM<< TRUNCNBR(*NO);                                         *
 //     >>PARM<< DBGVIEW(*LIST);                                        *
+//     >>PARM<< OPTION(*EVENTF);                                       *
 //   >>END-COMPILE<<                                                   *
 //                                                                     *
 //   >>EXECUTE<<                                                       *

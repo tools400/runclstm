@@ -37,6 +37,7 @@
 //   >>COMPILE<<                                                       *
 //     >>PARM<< TRUNCNBR(*NO);                                         *
 //     >>PARM<< DBGVIEW(*LIST);                                        *
+//     >>PARM<< OPTION(*EVENTF);                                       *
 //   >>END-COMPILE<<                                                   *
 //                                                                     *
 //   >>EXECUTE<<                                                       *
