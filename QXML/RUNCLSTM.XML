@@ -51,7 +51,7 @@
       appblddate CDATA #REQUIRED
      >
      ]>
-<upload  appname="RUNCLSTM"  appauthor="Thomas Raddatz"  appblddate=" 6/07/2026">
+<upload  appname="RUNCLSTM"  appauthor="Thomas Raddatz"  appblddate="11/08/2026">
 <install_instructions><![CDATA[
      *----------------------------------------------------------------      ------
      *  1. Upload entire XML to your AS/400 to a source file 112 long, into any mbr
@@ -1767,7 +1767,7 @@ srclen  =  "00112"
 srccssid=  "01141">
 <copysrc><![CDATA[
 **free
-ctl-opt copyright('V1.3 - 07.06.2026 - mailto: thomas.raddatz@tools400.de');
+ctl-opt copyright('V1.4 - 08.11.2026 - mailto: thomas.raddatz@tools400.de');
 ]]>  </copysrc>
 </mbr>
 <sendmsg  sendmsgid="CPF9897" sendmsgtype = "*STATUS   "><![CDATA[
@@ -6730,122 +6730,6 @@ srclen  =  "00112"
 srccssid=  "01141">
 <copysrc><![CDATA[
 **free
-//** START HEADER FILE SPECIFICATIONS *****************************
-//                                                                *
-// Header File Name: SQLCLI                                       *
-//                                                                *
-// Descriptive Name: Structured Query Language (SQL) Call Level   *
-//                   Interface.                                   *
-//                                                                *
-// 5716-SS1  (C) Copyright IBM Corp. 1995,1995                    *
-// All rights reserved.                                           *
-// US Government Users Restricted Rights -                        *
-// Use, duplication or disclosure restricted                      *
-// by GSA ADP Schedule Contract with IBM Corp.                    *
-//                                                                *
-// Licensed Materials-Property of IBM                             *
-//                                                                *
-//                                                                *
-// Description: The SQL Call Level Interface provides access to   *
-//              most SQL functions, without the need for a        *
-//              precompiler.                                      *
-//                                                                *
-// Header Files Included: SQLCLI                                  *
-//                                                                *
-// Function Prototype List:  SQLAllocConnect                      *
-//                           SQLAllocEnv                          *
-//                           SQLAllocHandle                       *
-//                           SQLAllocStmt                         *
-//                           SQLBindCol                           *
-//                           SQLBindFileToCol                     *
-//                           SQLBindFileToParam                   *
-//                           SQLBindParam                         *
-//                           SQLBindParameter                     *
-//                           SQLCancel                            *
-//                           SQLCloseCursor                       *
-//                           SQLColAttributes                     *
-//                           SQLColumns                           *
-//                           SQLConnect                           *
-//                           SQLCopyDesc                          *
-//                           SQLDataSources                       *
-//                           SQLDescribeCol                       *
-//                           SQLDescribeParam                     *
-//                           SQLDisconnect                        *
-//                           SQLDriverConnect                     *
-//                           SQLEndTran                           *
-//                           SQLError                             *
-//                           SQLExecDirect                        *
-//                           SQLExecute                           *
-//                           SQLExtendedFetch                     *
-//                           SQLFetch                             *
-//                           SQLFetchScroll                       *
-//                           SQLForeignKeys                       *
-//                           SQLFreeConnect                       *
-//                           SQLFreeEnv                           *
-//                           SQLFreeHandle                        *
-//                           SQLFreeStmt                          *
-//                           SQLGetCol                            *
-//                           SQLGetConnectOption                  *
-//                           SQLGetCursorName                     *
-//                           SQLGetConnectAttr                    *
-//                           SQLGetData                           *
-//                           SQLGetDescField                      *
-//                           SQLGetDescRec                        *
-//                           SQLGetDiagField                      *
-//                           SQLGetDiagRec                        *
-//                           SQLGetEnvAttr                        *
-//                           SQLGetFunctions                      *
-//                           SQLGetInfo                           *
-//                           SQLGetLength                         *
-//                           SQLGetPosition                       *
-//                           SQLGetStmtAttr                       *
-//                           SQLGetStmtOption                     *
-//                           SQLGetSubString                      *
-//                           SQLGetTypeInfo                       *
-//                           SQLLanguages                         *
-//                           SQLMoreResults                       *
-//                           SQLNativeSql                         *
-//                           SQLNumParams                         *
-//                           SQLNumResultCols                     *
-//                           SQLParamData                         *
-//                           SQLParamOptions                      *
-//                           SQLPrepare                           *
-//                           SQLPrimaryKeys                       *
-//                           SQLProcedureColumns                  *
-//                           SQLProcedures                        *
-//                           SQLPutData                           *
-//                           SQLReleaseEnv                        *
-//                           SQLRowCount                          *
-//                           SQLSetConnectAttr                    *
-//                           SQLSetConnectOption                  *
-//                           SQLSetCursorName                     *
-//                           SQLSetDescField                      *
-//                           SQLSetDescRec                        *
-//                           SQLSetEnvAttr                        *
-//                           SQLSetParam                          *
-//                           SQLSetStmtAttr                       *
-//                           SQLSetStmtOption                     *
-//                           SQLSpecialColumns                    *
-//                           SQLStatistics                        *
-//                           SQLTables                            *
-//                           SQLTransact                          *
-//                                                                *
-// Change Activity:                                               *
-//                                                                *
-// CFD List:                                                      *
-//                                                                *
-// FLAG REASON       LEVEL DATE   PGMR      CHANGE DESCRIPTION    *
-// ---- ------------ ----- ------ --------- ----------------------*
-// $A0= D91823       3D60  941206 MEGERIAN  New Include           *
-// $A1= D94881       4D20  960816 MEGERIAN  V4R2M0 enhancements   *
-// $A2= D95600       4D30  970910 MEGERIAN  V4R3M0 enhancements   *
-// $A3= P3682850     4D40  981030 MEGERIAN  V4R4M0 enhancements   *
-// $A4= D97596       4D50  990326 LJAMESON  V4R5M0 enhancements   *
-//                                                                *
-// End CFD List.                                                  *
-//                                                                *
-//  Additional notes about the Change Activity                    *
-// End Change Activity.                                           *
 //*****************************************************************
 //                                                                *
 // Translated from SQLCLI.h V5R1 by Thomas Raddatz at tools400.de *
@@ -6857,7 +6741,7 @@ srccssid=  "01141">
 //                                                                *
 //** END HEADER FILE SPECIFICATIONS *******************************
 
-/if NOT defined(SQL_H_SQLCLI)
+/if NOT DEFINED(SQL_H_SQLCLI)
 
 // Permit duplicate Includes *
 /define SQL_H_SQLCLI
@@ -7241,6 +7125,8 @@ dcl-c SQL_NULL_HENV 0;
 dcl-c SQL_NULL_HDBC 0;
 dcl-c SQL_NULL_HSTMT 0;
 
+/if NOT DEFINED(C_DATA_TYPES)
+/define C_DATA_TYPES
 // C Data Types
 dcl-s char_t char(1) based(pDummy);
 dcl-s short_t int(5) based(pDummy);
@@ -7251,6 +7137,7 @@ dcl-s long_t int(10) based(pDummy);
 dcl-s ulong_t uns(10) based(pDummy);
 dcl-s float_t float(4) based(pDummy);
 dcl-s double_t float(8) based(pDummy);
+/endif
 
 // SQL Data Types
 dcl-s SDWORD_t like(long_t) based(pDummy);
@@ -8103,6 +7990,13 @@ dcl-c SQL_C_DBCLOB 15; // ('SQL_DBCLOB')
 dcl-c SQL_C_BLOB_LOCATOR 20; // ('SQL_BLOB_LOC
 dcl-c SQL_C_CLOB_LOCATOR 21; // ('SQL_CLOB_LOC
 dcl-c SQL_C_DBCLOB_LOCATOR 22; // ('SQL_DBCLOB_L
+
+// SQL states:
+// Class Code 00: Unqualified Successful Completion
+dcl-c SQL_STATE_SUCCESS '00000';
+// Class Code 01: Warning
+dcl-c SQL_STATE_WARN_CREATED_NOT_JOURNALED '01567';
+
 /endif
 ]]>  </copysrc>
 </mbr>
