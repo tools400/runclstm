@@ -1,6 +1,6 @@
 # RUNCLSTM - A Tools/400 Utility
 
-RUNCLSTM is a utility for running scipts of CL commands.
+RUNCLSTM is a utility for running scripts of CL commands.
 
 ## Dependencies
 
